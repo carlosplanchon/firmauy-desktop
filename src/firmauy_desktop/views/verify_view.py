@@ -34,7 +34,8 @@ from firmauy_desktop.labels import (TIMESTAMP_MEANING, indication_label,
 from firmauy_desktop.tasks import Deadline, TaskRunner
 from firmauy_desktop.ui import components as c
 from firmauy_desktop.ui import tokens as ui_tokens
-from firmauy_desktop.widgets import Collapsible, DropArea, FileListWidget, ValidatorRow
+from firmauy_desktop.widgets import (Collapsible, DropArea, FileListWidget, ValidatorRow,
+                                     native_path)
 
 # What the indication means to somebody who did not ask for a cryptography lesson.
 _MEANING = {
@@ -764,7 +765,7 @@ class VerifyView(c.Screen):
         path, _ = QFileDialog.getOpenFileName(self, "Elegir el archivo que se firmó")
         if not path:
             return
-        self._original = path
+        self._original = native_path(path)
         self._original_row.hide()
         self._start()
 
@@ -779,7 +780,7 @@ class VerifyView(c.Screen):
         if not chosen:
             return
         self._reverify_path = path
-        if not self._runner.run(verify_file, path, original=chosen,
+        if not self._runner.run(verify_file, path, original=native_path(chosen),
                                 check_revocation=self._asked_revocation,
                                 tsa_ca=self._run_anchors,
                                 allow_private_network=self._run_private_network):

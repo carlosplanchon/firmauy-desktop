@@ -10,6 +10,8 @@ the claim is stronger and simpler: the value arrives exactly as the certificate 
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QLabel
@@ -161,7 +163,7 @@ def test_choosing_the_original_re_verifies_with_it(make_view, qtbot, fake_backen
     with qtbot.waitSignal(view._runner.finished, timeout=5000):
         view._pick_original()
 
-    assert fake_backend.kwargs_for("verify_file")["original"] == "/tmp/contrato.pdf"
+    assert fake_backend.kwargs_for("verify_file")["original"] == str(Path("/tmp/contrato.pdf"))
     assert view._original_row.isHidden() is True
     assert "VÁLIDO" in widget_text(view._verdict)
 
@@ -696,7 +698,8 @@ def test_the_big_drop_area_gives_way_once_there_is_a_file(make_view, qtbot):
     assert view._drop.isHidden() is True
     assert view._chosen.isHidden() is False
     assert "contrato.pdf.p7s" in widget_text(view._chosen)
-    assert "/home/ana" in widget_text(view._chosen), "two files of the same name need the folder"
+    # In this system's spelling: the folder is shown the way the file manager writes it.
+    assert str(Path("/home/ana")) in widget_text(view._chosen),         "two files of the same name need the folder"
 
 
 def test_the_options_are_folded_away_and_still_work(make_view, qtbot):

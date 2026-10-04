@@ -209,7 +209,8 @@ def test_the_sandbox_is_a_store_of_its_own(qapp, tmp_path):
     where = sandbox.isolate_settings(settings.Settings(advanced_mode=True))
 
     assert settings.load().advanced_mode is True
-    assert QSettings().fileName().startswith(where)
+    # As paths: Qt names the file with "/" everywhere, and on Windows `where` uses a backslash.
+    assert Path(QSettings().fileName()).is_relative_to(where)
     assert not where.startswith(str(tmp_path)), "it reused the suite's store instead of its own"
 
 
@@ -587,6 +588,15 @@ def test_the_application_id_says_the_same_thing_everywhere():
         text = (linux / script).read_text(encoding="utf-8")
         assert f'APP_ID="{APP_ID}"' in text, f"{script} tiene su propia copia del id"
 
+    # Windows: the installer's AppId and its shortcut's AppUserModelID, and the check that looks
+    # for the uninstall entry named after it.
+    windows = _repo() / "packaging" / "windows"
+    iss = (windows / "firmauy-desktop.iss").read_text(encoding="utf-8-sig")
+    assert f'#define AppIdentity "{APP_ID}"' in iss, "el instalador tiene otro id"
+    assert "AppId={#AppIdentity}" in iss
+    check = (windows / "check_install.ps1").read_text(encoding="utf-8-sig")
+    assert f'$APP_ID = "{APP_ID}"' in check, "check_install.ps1 tiene su propia copia del id"
+
 
 def test_the_window_reports_which_desktop_entry_it_is(qapp):
     """Qt's own reason for this property: the windowing system needs it "without resorting to
@@ -598,6 +608,22 @@ def test_the_window_reports_which_desktop_entry_it_is(qapp):
     from firmauy_desktop.settings import APP_ID
 
     assert qapp.desktopFileName() == APP_ID
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="the AppUserModelID is Windows'")
+def test_the_taskbar_knows_the_window_by_the_same_id(qapp):
+    """Windows' counterpart of the desktop entry: the id the installer's shortcut carries too.
+    Read back off the process, so a call that never runs fails here."""
+    import ctypes
+
+    from firmauy_desktop.settings import APP_ID
+
+    value = ctypes.c_wchar_p()
+    assert ctypes.windll.shell32.GetCurrentProcessExplicitAppUserModelID(ctypes.byref(value)) == 0
+    try:
+        assert value.value == APP_ID
+    finally:
+        ctypes.windll.ole32.CoTaskMemFree(value)
 
 
 def test_the_desktop_entry_does_not_claim_files_the_app_cannot_open():
@@ -732,14 +758,19 @@ def test_the_release_runs_the_same_checks_as_the_everyday_build():
     that drifts would be the build nobody verified before publishing it."""
     release = (_repo() / ".github" / "workflows" / "release.yml").read_text(encoding="utf-8")
 
+    ci = (_repo() / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
     for script in ("packaging/check_bundle.sh", "packaging/linux/check_install.sh",
-                   "packaging/linux/make_release.sh", "tools.verify_fixture"):
+                   "packaging/linux/make_release.sh", "tools.verify_fixture",
+                   "packaging/windows/check_bundle.ps1", "packaging/windows/check_install.ps1",
+                   "packaging/windows/make_release.ps1"):
         assert script in release, f"el release no usa {script}"
+        assert script in ci, f"el CI de todos los días no usa {script}"
 
     # Same floor as the everyday bundle job. A release built somewhere newer would run on fewer
-    # machines than the one CI has been proving all along.
-    ci = (_repo() / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
-    assert "ubuntu-22.04" in release and "ubuntu-22.04" in ci
+    # machines than the one CI has been proving all along. Windows has no glibc to raise a floor,
+    # but the same pin keeps the image, and the Inno Setup on it, from moving under the release.
+    for runner in ("ubuntu-22.04", "windows-2022"):
+        assert runner in release and runner in ci, f"{runner} no está fijado en los dos"
 
 
 def test_no_workflow_may_quietly_relock():
@@ -785,7 +816,8 @@ def test_the_interpreter_that_ships_is_chosen_rather_than_resolved():
             assert re.search(r'python-version:\s*"[0-9.]+"', job), (
                 f"{name}: un job construye un bundle sin decir con qué Python")
 
-    assert checked == 2, f"esperaba dos jobs que construyan un bundle, encontré {checked}"
+    # Linux and Windows, in the everyday build and in the release.
+    assert checked == 4, f"esperaba cuatro jobs que construyan un bundle, encontré {checked}"
 
 
 def _release_jobs() -> dict:
@@ -817,19 +849,23 @@ def test_the_job_that_can_publish_runs_nothing_it_did_not_receive():
     already checked and does the two things that need the authority.
     """
     jobs = _release_jobs()
-    assert set(jobs) == {"build", "publish"}, list(jobs)
+    builders = ("build", "build-windows")
+    assert set(jobs) == {*builders, "publish"}, list(jobs)
 
-    build, publish = jobs["build"], jobs["publish"]
+    publish = jobs["publish"]
 
-    assert "contents: read" in build
+    for name in builders:
+        assert "contents: read" in jobs[name], f"{name} no declara contents: read"
+        for granted in ("id-token: write", "attestations: write", "contents: write"):
+            assert granted not in jobs[name], f"{name}, que construye, tiene {granted}"
     for granted in ("id-token: write", "attestations: write", "contents: write"):
-        assert granted not in build, f"el job que construye tiene {granted}"
         assert granted in publish, f"al job que publica le falta {granted}"
 
     for runs_code in ("actions/checkout", "uv run", "uv sync", "uvx ", "packaging/"):
         assert runs_code not in publish, f"el job que publica ejecuta {runs_code!r}"
 
-    assert "needs: build" in publish, "publicar no espera a que el build haya pasado"
+    assert "needs: [build, build-windows]" in publish, \
+        "publicar no espera a que los dos builds hayan pasado"
 
     # The checksum is written in one job and read in the other, and until it is read it is only a
     # file claiming to describe the archive beside it. Checked here, after the handoff and before
@@ -900,3 +936,15 @@ def test_the_readme_does_not_promise_platforms_nothing_builds():
     assert "installers per platform" not in readme
     assert "code-signing" not in readme
     assert "no Windows or macOS builds yet" in readme
+
+
+def test_the_windows_scripts_carry_a_byte_order_mark():
+    """Inno Setup and Windows PowerShell 5.1 read a file without a BOM as the ANSI code page, so
+    "versión" comes out as "versiÃ³n" in a log, and "Planchón" the same in the installer's
+    copyright. Measured on both. PowerShell 7 and Python read the BOM fine, so it costs nothing."""
+    windows = _repo() / "packaging" / "windows"
+    files = sorted([*windows.glob("*.ps1"), *windows.glob("*.iss")])
+    assert files, "no hay scripts de Windows"
+    missing = [f.name for f in files if not f.read_bytes().startswith(b"\xef\xbb\xbf")]
+    assert missing == [], f"sin BOM: {missing}"
+

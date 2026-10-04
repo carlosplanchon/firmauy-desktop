@@ -55,6 +55,9 @@ CHECK_LABEL = {
     # doctor
     "firmauy": "firmauy",
     "pcscd running": "pcscd andando",
+    # Windows has no pcscd. firmauy 1.21.0 asks the Smart Card service (SCardSvr) instead, in the
+    # same position on the screen.
+    "Smart Card service available": "Servicio de tarjeta inteligente disponible",
     "PC/SC reader detected": "Lector PC/SC detectado",
     "cédula detected": "Cédula detectada",
     "PKCS#11 module present": "Módulo PKCS#11 presente",
@@ -126,6 +129,15 @@ CHECK_FIX = {
         "Conectá un lector.",
     "Insert the cédula and check the reader connection / pcscd.":
         "Poné la cédula en el lector.",
+    # Windows, from firmauy 1.21.0. Same reasoning as the two above: the service has its own row.
+    "Insert the cédula and check the reader connection / Smart Card service.":
+        "Poné la cédula en el lector.",
+    "Connect the reader; Windows starts the Smart Card service (SCardSvr) on its own.":
+        "Conectá el lector. Windows arranca solo el servicio de tarjeta inteligente (SCardSvr).",
+    # Named as a Spanish Windows names them, since that is the screen somebody will be looking at.
+    'Connect a reader and check that Windows lists it under "Smart card readers" in Device Manager.':
+        'Conectá un lector y fijate que Windows lo muestre en "Lectores de tarjetas inteligentes", '
+        "en el Administrador de dispositivos.",
     # --reader is a command-line flag. In here the reader is a dropdown at the top of this screen.
     "Insert the cédula, or pass --reader if you have more than one reader.":
         "Poné la cédula. Si tenés más de un lector, elegilo arriba.",
@@ -136,6 +148,15 @@ CHECK_FIX = {
     "Install the middleware (Arch: yay -S cedula-uruguay-pkcs11), or pass --pkcs11-lib.":
         "Instalá el middleware (en Arch: yay -S cedula-uruguay-pkcs11), o poné la ruta del "
         "módulo en Ajustes.",
+    "Install Thales Classic Client (the cédula middleware), or pass --pkcs11-lib.":
+        "Instalá Thales Classic Client (el middleware de la cédula), o poné la ruta del módulo en "
+        "Ajustes.",
+    # Built rather than written: the 64-bit path follows the colon, and check_fix keeps it as it is.
+    # Classic Client installs both copies, and the one under "Program Files (x86)" cannot load in
+    # this app, which is 64-bit like the Python it was frozen from.
+    "A 64-bit Python cannot load the 32-bit gclib.dll. Use the 64-bit one":
+        "Esta app es de 64 bits y no puede cargar el gclib.dll de 32 bits. En Ajustes, poné el de "
+        "64 bits",
     "The module is present but could not be initialised; check the middleware install.":
         "El módulo está pero no se pudo inicializar. Reinstalá el middleware, o probá el modo "
         "directo en Ajustes.",
@@ -154,8 +175,17 @@ VALIDATOR_TOOLTIP = "Se abre en tu navegador. La app no sube nada por sí sola."
 
 
 def check_fix(fix: str) -> str:
-    """The Spanish for what to do about a failing check, or the text itself."""
-    return CHECK_FIX.get(fix, fix)
+    """The Spanish for what to do about a failing check, or the text itself.
+
+    A built fix gets the same treatment as a built detail: the English before the first ``": "``
+    is glossed, and what follows, a module path, is kept verbatim.
+    """
+    if fix in CHECK_FIX:
+        return CHECK_FIX[fix]
+    prefix, colon, rest = fix.partition(": ")
+    if colon and prefix in CHECK_FIX:
+        return f"{CHECK_FIX[prefix]}: {rest}"
+    return fix
 
 
 def check_detail(detail: str) -> str:

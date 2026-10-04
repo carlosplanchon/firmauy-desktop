@@ -18,10 +18,10 @@ to the terminal. This repository is the part a person can use without one.
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/carlosplanchon/firmauy-desktop)
 
-> **Status: alpha.** The screens work on Linux. Signing defaults to the direct
-> PC/SC backend (no OpenSC or middleware needed, just a reader and `pcscd`), and
-> a PKCS#11 module can be configured instead. There are no Windows or macOS
-> builds yet.
+> **Status: alpha.** The screens work on Linux and Windows. Signing defaults to the direct
+> PC/SC backend (no OpenSC or middleware needed, just a reader, and `pcscd` on Linux), and
+> a PKCS#11 module can be configured instead. The Windows builds are not code-signed yet, and
+> there is no macOS build.
 
 > **Not an official application of the Uruguayan State, and not affiliated with AGESIC.** It is
 > an independent tool built on the published interfaces of the cédula. What that disclaims is
@@ -81,19 +81,26 @@ backend, the reader, the PKCS#11 module and a timestamping authority.
 
 - **A card reader** and a **cédula whose certificate is still valid**. The certificate expires
   with the card, so a cédula past its date signs nothing and has to be renewed.
-- **Linux.** There are no Windows or macOS builds yet.
-- **`pcscd` running.** That is the entire requirement for the default backend, which talks to the
-  card directly over PC/SC. No OpenSC, no proprietary middleware, nothing else to install.
+- **Linux x86_64, or Windows 10 or 11 (64-bit).** There is no macOS build yet.
+- **On Linux, `pcscd` running.** That is the entire requirement for the default backend, which
+  talks to the card directly over PC/SC. No OpenSC, no proprietary middleware, nothing else to
+  install.
+- **On Windows, nothing.** Windows ships the reader driver and the Smart Card service the default
+  backend talks to, and starts the service by itself when a reader is plugged in.
 - **A PKCS#11 module**, and only then: if you switch the backend in Ajustes, or use the Avanzado
-  screen, which is built on one. The cédula's module is `libgclib.so`, packaged on Arch Linux as
-  `cedula-uruguay-pkcs11`. The full smart-card setup is in
+  screen, which is built on one. On Linux the cédula's module is `libgclib.so`, packaged on Arch
+  Linux as `cedula-uruguay-pkcs11`; the full smart-card setup is in
   [firmauy's README](https://github.com/carlosplanchon/firmauy#setup-on-arch-linux), which is
-  where it is maintained rather than copied here.
+  where it is maintained rather than copied here. On Windows it is Thales Classic Client, and the
+  app finds its module on its own at `C:\Program Files\Thales\Classic Client\BIN\gclib.dll`.
+  Classic Client also installs a 32-bit copy under `Program Files (x86)`, which this 64-bit app
+  cannot load, and Diagnóstico says so if it is the one configured.
 - **Python 3.11 or newer**, only to run from source. A packaged build carries its own.
 
 **Diagnóstico answers all of this from inside the app**, so a card that does not show up is a
 screen to open rather than something to guess at: it reports firmauy's version, whether `pcscd`
-is answering, which readers it can see, and whether the national CA certificates are in place.
+(on Windows, the Smart Card service) is answering, which readers it can see, and whether the
+national CA certificates are in place.
 
 ## Privacy
 
@@ -167,9 +174,10 @@ worker asks the UI thread to open the dialog, and hands the PIN back.
 product: it depends on `firmauy` and owns its own packaging and release pipeline, so a version of
 the library and a version of the application never have to be the same thing.
 
-What that pipeline builds today is Linux x86_64, on Ubuntu 22.04, and that is all. Windows and
-macOS need a build on each of those, since PyInstaller does not cross-compile, and the code
-signing each platform expects needs certificates this project does not have.
+What that pipeline builds today is Linux x86_64, on Ubuntu 22.04, and Windows x64, on Windows
+Server 2022. macOS needs a build of its own, since PyInstaller does not cross-compile. The code
+signing each platform expects needs certificates this project does not have yet, which is why
+Windows warns before running the download.
 
 ## Run from source
 
@@ -190,16 +198,28 @@ uv run pyinstaller --clean --noconfirm packaging/firmauy-desktop.spec
 
 The [spec](packaging/firmauy-desktop.spec) excludes the heavy Qt modules the app
 never uses (no QtWebEngine, QML/Quick or multimedia), which keeps the Linux
-bundle around 305 MB instead of 850 MB. PyInstaller does not cross-compile, so
-each platform's binary is built on that platform.
+bundle around 305 MB instead of 850 MB, and the Windows one around 160 MB. PyInstaller does not
+cross-compile, so each platform's binary is built on that platform.
+
+On Windows the same command leaves `dist\firmauy-desktop\firmauy-desktop.exe`, and turning it into
+what a release hands over takes [Inno Setup 6](https://jrsoftware.org/isinfo.php) for the
+installer:
+
+```powershell
+packaging\windows\make_release.ps1 -Bundle dist\firmauy-desktop -Out release
+# release\firmauy-desktop-0.1.0-windows-x86_64.zip and ...-setup.exe, each with its .sha256
+```
 
 ## Download it
 
-Builds live in **[Releases](https://github.com/carlosplanchon/firmauy-desktop/releases)**. Each one
-is a `.tar.gz` with a `.sha256` beside it. The archive is not a folder on purpose: a GitHub
-download of a directory is a zip, and zipped uploads do not keep file permissions, so the binary
-would arrive without its executable bit and without the 43 symbolic links a PyInstaller bundle
-needs.
+Builds live in **[Releases](https://github.com/carlosplanchon/firmauy-desktop/releases)**, every
+file with a `.sha256` beside it:
+
+- **Linux:** a `.tar.gz`. It is not a zip on purpose: zipped uploads do not keep file permissions,
+  so the binary would arrive without its executable bit and without the 43 symbolic links a
+  PyInstaller bundle needs.
+- **Windows:** an installer, `-setup.exe`, and a `.zip` of the same bundle for running it without
+  installing. A zip is fine there, since a Windows bundle has neither permissions nor links to lose.
 
 Two checks before you run it, and they answer different questions:
 
@@ -208,7 +228,9 @@ sha256sum -c firmauy-desktop-0.1.0-linux-x86_64.tar.gz.sha256
 ```
 
 says the download did not get mangled on the way, and nothing about who made it. Whoever could
-replace the archive could replace the checksum sitting next to it.
+replace the archive could replace the checksum sitting next to it. On Windows, compare
+`(Get-FileHash firmauy-desktop-0.1.0-windows-x86_64-setup.exe).Hash` with the first word of its
+`.sha256`, case aside.
 
 ```bash
 gh attestation verify firmauy-desktop-0.1.0-linux-x86_64.tar.gz \
@@ -217,7 +239,8 @@ gh attestation verify firmauy-desktop-0.1.0-linux-x86_64.tar.gz \
 
 says these exact bytes came out of this repository's release workflow, from a specific commit. It
 is not a signature by this project: the key is GitHub's, and the claim is about where the build
-happened rather than about anybody's intent to publish.
+happened rather than about anybody's intent to publish. The Windows files are attested the same
+way, and the command is the same with their names.
 
 The artifacts attached to individual CI runs are development builds of one commit, kept for a
 week. They are for looking at a change, not for using the program.
@@ -246,6 +269,25 @@ The release build is pinned to Ubuntu 22.04, which carries glibc 2.35, because P
 not bundle glibc: the binary uses whatever the machine running it has. Older distributions than
 that are not supported, and the floor cannot go much lower anyway, since PySide6's own wheel is
 `manylinux_2_34`.
+
+## Install it on Windows
+
+Run `firmauy-desktop-0.1.0-windows-x86_64-setup.exe`. By default it installs for your account
+only, into `%LOCALAPPDATA%\Programs\FirmaUY Desktop`, with no administrator rights, and adds a
+Start menu entry. Installing for every account on the machine is offered on its first page, and
+goes to Program Files. For an unattended install, `/VERYSILENT` works as with any Inno Setup
+installer.
+
+Or unzip `firmauy-desktop-0.1.0-windows-x86_64.zip` anywhere and run
+`firmauy-desktop\firmauy-desktop.exe`, which writes nothing outside your settings.
+
+The builds are not signed with a code-signing certificate yet, so SmartScreen will say it
+protected your PC the first time: "Más información", then "Ejecutar de todas formas". That warning
+is about who vouches for the file, which is the question `gh attestation verify` above answers.
+
+Installing over an existing copy replaces it rather than merging into it. Uninstalling, from
+Configuración or the Start menu, leaves your settings (`HKCU\Software\firmauy`) and the activity
+record (`%LOCALAPPDATA%\firmauy`) alone.
 
 ## Contributing & security
 

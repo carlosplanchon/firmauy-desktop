@@ -10,7 +10,15 @@ readme = "README.md"
 requires-python = ">=3.11"
 license = "Apache-2.0"
 dependencies = [
-    # 1.20.0 is the floor, and it is about telling apart two refusals that need opposite answers.
+    # 1.21.0 is the floor, and it is what makes a Windows build a signing application at all. Below
+    # it every signature failed on Windows at the moment the file was written, after the PIN had
+    # been typed and the card had signed: the staging file was opened with flags Windows does not
+    # have and renamed while still open, which Windows refuses. Its doctor also told a Windows user
+    # to run pacman and systemctl, and its default PKCS#11 module was a Linux path. 1.21.0 writes
+    # the output on Windows, asks the Smart Card service instead of pcscd, and defaults to Thales
+    # Classic Client's 64-bit gclib.dll. Nothing changed on Linux, by its own changelog.
+    #
+    # 1.20.0 before it, about telling apart two refusals that need opposite answers.
     # Below it a malformed PIN and a card on its last try were the same bare PinError, so the app
     # told them apart by whether its prompt had run, which the direct path gets wrong when it
     # counts the tries again after the prompt and finds one left. 1.20.0 raises PinFormatError
@@ -81,10 +89,10 @@ dependencies = [
     # already broken inside 1.x once and a `<2` would not have caught it. What actually pins what
     # ships is uv.lock, which the PyInstaller build freezes from. This bound only binds someone
     # installing from a clone without the lock. The day this is published as a wheel that stops
-    # being true, and the honest bound becomes the minor that was actually tested, `<1.21` today,
+    # being true, and the honest bound becomes the minor that was actually tested, `<1.22` today,
     # raised deliberately after CI rather than left open. That number tracks the floor below, so
     # it is written here as a rule rather than as a figure to keep in step by hand.
-    "firmauy>=1.20.0,<2",
+    "firmauy>=1.21.0,<2",
     # Explicit, though firmauy already pulls it in through requests. It is the bundle of public
     # roots a signature timestamp is judged against when the user has not named their own, so an
     # upstream dependency dropping it would take a verification option down with it, not a
