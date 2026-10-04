@@ -23,6 +23,7 @@ written down because it is the first thing anyone will ask for.
 
 from __future__ import annotations
 
+import sys
 from dataclasses import dataclass, fields
 from typing import Optional
 
@@ -117,6 +118,27 @@ def apply_identity(app) -> None:
     # generic icon in the task switcher and split one application into two entries under Wayland.
     # The base name, with no path and no ".desktop" on the end.
     app.setDesktopFileName(APP_ID)
+    if sys.platform == "win32":
+        _set_windows_app_id(APP_ID)
+
+
+def _set_windows_app_id(app_id: str) -> None:
+    """The same identity, said the way the Windows shell asks for it.
+
+    Windows ignores the desktop file name. What groups windows on the taskbar, and ties the
+    running window to the Start menu shortcut the installer made, is the AppUserModelID. Left
+    unset, Windows derives one from the executable's path, so a pinned shortcut and the window it
+    opens can come out as two buttons. The installer stamps the same string on its shortcut.
+
+    Before any window exists, which is why it lives here. A failure is not worth stopping for: it
+    costs a taskbar button, not a signature.
+    """
+    import ctypes
+
+    try:
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(ctypes.c_wchar_p(app_id))
+    except (AttributeError, OSError):
+        pass
 
 
 def load() -> Settings:

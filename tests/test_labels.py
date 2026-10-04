@@ -91,44 +91,72 @@ def _doctor_strings() -> tuple[set[str], set[str]]:
 
     from firmauy import _shared
 
+    tree = ast.parse(inspect.getsource(_shared))
     details, fixes = set(), set()
-    for node in ast.walk(ast.parse(inspect.getsource(_shared))):
+    for node in ast.walk(tree):
         if not (isinstance(node, ast.Call) and getattr(node.func, "id", "") == "add"):
             continue
         if len(node.args) >= 3:
-            found = _detail_text(node.args[2])
-            if found is not None:
-                details.add(found)
+            details |= _detail_texts(node.args[2], tree)
         for keyword in node.keywords:
             # Only these two. add() also takes sensitive=, and a bare `else` swept True into the
             # set of things that need translating.
             if keyword.arg not in ("detail", "fix"):
-                # add() also takes sensitive=, and a bare else swept True into the set of things
-                # that need translating.
                 continue
-            found = _detail_text(keyword.value)
-            if found is not None:
-                (details if keyword.arg == "detail" else fixes).add(found)
+            found = _detail_texts(keyword.value, tree)
+            (details if keyword.arg == "detail" else fixes).update(found)
     return details, fixes
 
 
-def _detail_text(node) -> str | None:
-    """The English a detail carries, whether it is written out or built.
+def _detail_texts(node, tree, seen=frozenset()) -> set[str]:
+    """The English a detail or a fix can carry, whether it is written out or built.
 
     firmauy sends ``f"not found: {pkcs11_lib}"`` as one f-string, so the English half is not a
     literal anywhere and the first version of this walk could not see it. That made a test named
     for completeness blind to exactly the kind of string a table of glosses cannot hold.
+
+    It went blind a second way when firmauy 1.21.0 taught the doctor about Windows: a fix became
+    ``"A" if WINDOWS else "B"``, ``helper() or "C"``, a module constant, or a local name assigned
+    the default before a branch replaces it. Each of those is followed to the literals behind it,
+    and a call to one of _shared's own functions to the strings it returns, so a new branch
+    cannot slip past the gloss tables by being one expression away from ``add``.
     """
     import ast
 
     if isinstance(node, ast.Constant) and isinstance(node.value, str):
-        return node.value
+        return {node.value}
     if isinstance(node, ast.JoinedStr):
         # The leading literal of an f-string, up to where the data starts.
         head = node.values[0] if node.values else None
         if isinstance(head, ast.Constant) and isinstance(head.value, str):
-            return head.value.removesuffix(": ").strip() or None
-    return None
+            text = head.value.removesuffix(": ").strip()
+            return {text} if text else set()
+        return set()
+    if isinstance(node, ast.IfExp):
+        return _detail_texts(node.body, tree, seen) | _detail_texts(node.orelse, tree, seen)
+    if isinstance(node, ast.BoolOp):
+        return set().union(*(_detail_texts(value, tree, seen) for value in node.values))
+    if isinstance(node, ast.Name):
+        # Every assignment to that name in the module, constant or local: over-collecting a
+        # string here can only ask for one gloss too many, never hide one. `seen` because
+        # `fix = helper() or fix` names itself.
+        if node.id in seen:
+            return set()
+        seen = seen | {node.id}
+        return set().union(*(_detail_texts(a.value, tree, seen) for a in ast.walk(tree)
+                             if isinstance(a, ast.Assign)
+                             and any(getattr(t, "id", None) == node.id for t in a.targets)))
+    if isinstance(node, ast.Call) and isinstance(node.func, ast.Name):
+        # Except _format_error, which hands back an exception's own text: data, like a path. Its
+        # two literals are PIN refusals, and the doctor never asks for a PIN.
+        if node.func.id in seen or node.func.id == "_format_error":
+            return set()
+        seen = seen | {node.func.id}
+        returns = [r.value for f in ast.walk(tree)
+                   if isinstance(f, ast.FunctionDef) and f.name == node.func.id
+                   for r in ast.walk(f) if isinstance(r, ast.Return) and r.value is not None]
+        return set().union(*(_detail_texts(value, tree, seen) for value in returns))
+    return set()
 
 
 def test_every_detail_the_doctor_can_show_is_glossed():
@@ -177,6 +205,15 @@ def test_the_glossed_details_are_ones_firmauy_actually_emits():
 ])
 def test_a_built_detail_gets_its_prefix_glossed(detail, spanish):
     assert labels.check_detail(detail) == spanish
+
+
+def test_a_built_fix_keeps_its_path():
+    """The 32-bit gclib.dll fix ends in the path to use instead, which is the whole instruction."""
+    path = r"C:\Program Files\Thales\Classic Client\BIN\gclib.dll"
+    fix = f"A 64-bit Python cannot load the 32-bit gclib.dll. Use the 64-bit one: {path}"
+    spanish = labels.check_fix(fix)
+    assert spanish.startswith("Esta app es de 64 bits")
+    assert spanish.endswith(f": {path}")
 
 
 @pytest.mark.parametrize("detail", [

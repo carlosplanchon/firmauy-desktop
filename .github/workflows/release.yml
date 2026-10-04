@@ -143,9 +143,94 @@ jobs:
           compression-level: 0
           if-no-files-found: error
 
+  build-windows:
+    name: build and check on Windows
+    # Its own job rather than a matrix entry of the one above: almost no step is shared, and a
+    # matrix would turn every step into a branch on the OS. Same authority, which is none.
+    runs-on: windows-2022
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7  # v10.2.0
+        with:
+          enable-cache: true
+          python-version: "3.14"
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Inno Setup
+        run: |
+          if (-not (Test-Path "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe")) {
+            choco install innosetup --no-progress -y
+          }
+
+      # The tag was already held against __version__ in the other job. This one only reads it.
+      - name: The version
+        run: |
+          $init = Get-Content src/firmauy_desktop/__init__.py -Raw
+          if ($init -notmatch '(?m)^__version__ = "([^"]+)"') { throw "sin __version__" }
+          "VERSION=$($Matches[1])" >> $env:GITHUB_ENV
+
+      # The suite again, on the platform this job ships for. What passes on Linux can still trip
+      # over a path separator or a font here, and this is the build people on Windows will run.
+      - name: The suite
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: uv run pytest -q
+
+      - name: Build it
+        run: uv run pyinstaller --clean --noconfirm packaging/firmauy-desktop.spec
+
+      - name: Make the fixture
+        run: uv run python -m tools.verify_fixture "$env:RUNNER_TEMP\fixture"
+
+      - name: Check what PyInstaller wrote
+        run: >
+          packaging/windows/check_bundle.ps1 -Root dist/firmauy-desktop
+          -Fixture "$env:RUNNER_TEMP\fixture" -Version $env:VERSION
+
+      - name: Pack it
+        run: |
+          packaging/windows/make_release.ps1 -Bundle dist/firmauy-desktop -Out "$env:RUNNER_TEMP\release"
+          Remove-Item dist -Recurse -Force
+
+      - name: Unzip it the way somebody would
+        run: |
+          Expand-Archive "$env:RUNNER_TEMP\release\*.zip" -DestinationPath "$env:RUNNER_TEMP\unpacked"
+          $dir = (Get-ChildItem "$env:RUNNER_TEMP\unpacked" -Directory | Select-Object -First 1).FullName
+          "RELEASE_DIR=$dir" >> $env:GITHUB_ENV
+
+      - name: Check what comes back out of the zip
+        run: >
+          packaging/windows/check_bundle.ps1 -Root "$env:RELEASE_DIR\firmauy-desktop"
+          -Fixture "$env:RUNNER_TEMP\fixture" -Version $env:VERSION
+
+      - name: Install it, upgrade it and take it away
+        run: >
+          packaging/windows/check_install.ps1
+          -Setup (Get-Item "$env:RUNNER_TEMP\release\*-setup.exe").FullName
+          -Fixture "$env:RUNNER_TEMP\fixture"
+
+      # Handed over the same way as the Linux archive, under its own name so the two cannot
+      # overwrite each other on the way to the job that publishes.
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        with:
+          name: release-windows
+          path: |
+            ${{ runner.temp }}/release/*.zip
+            ${{ runner.temp }}/release/*.zip.sha256
+            ${{ runner.temp }}/release/*-setup.exe
+            ${{ runner.temp }}/release/*-setup.exe.sha256
+          compression-level: 0
+          if-no-files-found: error
+
   publish:
     name: attest and publish
-    needs: build
+    needs: [build, build-windows]
     runs-on: ubuntu-22.04
     permissions:
       id-token: write        # the OIDC token the attestation is signed against
@@ -155,9 +240,12 @@ jobs:
     # of any dependency: it receives bytes that were already checked and does the two things that
     # require the authority above.
     steps:
+      # Both builds into one directory: "release" from Linux and "release-windows". The names
+      # inside cannot collide, since each carries its platform.
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8.0.1
         with:
-          name: release
+          pattern: release*
+          merge-multiple: true
           path: release
 
       # The checksum was written next to the archive in the other job, and this is the first
@@ -187,7 +275,10 @@ jobs:
       - name: Attest where this came from
         uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6  # v4.2.2
         with:
-          subject-path: release/*.tar.gz
+          subject-path: |
+            release/*.tar.gz
+            release/*.zip
+            release/*-setup.exe
 
       # gh rather than a third-party action: it ships on the runner and needs no extra dependency
       # in the one job whose whole point is being able to say where its output came from.
@@ -207,10 +298,16 @@ jobs:
             --title "FirmaUY Desktop ${{ needs.build.outputs.version }}" \
             --notes "Linux x86_64, glibc 2.35 y superiores. Descomprimí y corré, o usá el install.sh que viene adentro.
 
+          Windows 10 y 11 de 64 bits: el instalador (-setup.exe), o el .zip para correrlo sin instalar. Todavía no está firmado con un certificado de código, así que Windows puede avisar que protegió tu equipo: Más información, y después Ejecutar de todas formas.
+
           Para comprobar que el archivo salió de este repositorio y no de otro lado:
 
-              gh attestation verify firmauy-desktop-*.tar.gz -R ${{ github.repository }}
+              gh attestation verify <archivo> -R ${{ github.repository }}
 
           El .sha256 al lado cubre la corrupción de la descarga, no el origen." \
             release/*.tar.gz \
-            release/*.tar.gz.sha256
+            release/*.tar.gz.sha256 \
+            release/*.zip \
+            release/*.zip.sha256 \
+            release/*-setup.exe \
+            release/*-setup.exe.sha256

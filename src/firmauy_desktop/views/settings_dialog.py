@@ -32,6 +32,7 @@ from firmauy_desktop import settings as settings_module
 from firmauy_desktop.ui import components as c
 from firmauy_desktop.ui.theming import theme
 from firmauy_desktop.settings import Settings
+from firmauy_desktop.widgets import native_path
 
 
 class SettingsDialog(QDialog):
@@ -344,7 +345,7 @@ class SettingsDialog(QDialog):
         path, _ = QFileDialog.getOpenFileName(self, "Elegir la imagen de la estampa",
                                               filter="Imágenes (*.png *.jpg *.jpeg)")
         if path:
-            self._stamp_image.setText(path)
+            self._stamp_image.setText(native_path(path))
 
     def _on_stamp_mode_changed(self) -> None:
         """Grey out every control that cannot do anything from here.
@@ -446,7 +447,7 @@ class SettingsDialog(QDialog):
         path, _ = QFileDialog.getOpenFileName(self, "Elegir el certificado de la TSA",
                                               filter="Certificados (*.pem *.crt *.cer)")
         if path:
-            self._tsa_ca.setText(path)
+            self._tsa_ca.setText(native_path(path))
 
     def _on_reject(self) -> None:
         """Put the appearance back. It is applied live so it can be judged, and a person who
