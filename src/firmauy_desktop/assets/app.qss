@@ -1,0 +1,342 @@
+/* The whole application's look, as one stylesheet.
+ *
+ * A template: every token is substituted from ui/tokens.py before this is applied, because Qt
+ * QSS has no variables, and no `em` or `rem` either, so a type scale relative to the platform's
+ * own default font has to be computed in Python.
+ *
+ * There is exactly one setStyleSheet call in this project, in ui/theming.py. A widget that
+ * styles itself is invisible to the dark scheme and to everything below, and a test enforces it.
+ */
+
+/* 1. base ----------------------------------------------------------------- */
+
+/* Colour and size cascade to everything; the background deliberately does not. A blanket
+ * background-color on QWidget paints the app colour over every card and group box, because a
+ * QLabel inside one is a QWidget too. Containers get theirs explicitly, and anything with no
+ * rule falls through to the palette's Window role, which is the same colour. */
+QWidget {
+    color: $fg_default;
+    font-size: ${type_body}pt;
+}
+
+QMainWindow, QDialog, QStackedWidget {
+    background-color: $bg_app;
+}
+
+/* Labels sit on whatever surface they landed on, rather than painting the app colour over a
+ * card. Only QLabel, because it is the only leaf that was actually doing it. */
+QLabel {
+    background: transparent;
+}
+
+QScrollArea, QScrollArea > QWidget > QWidget {
+    background-color: transparent;
+    border: none;
+}
+
+QScrollBar:vertical {
+    background: transparent;
+    width: 12px;
+    margin: 0;
+}
+QScrollBar::handle:vertical {
+    background: $border_strong;
+    border-radius: ${radius_sm}px;
+    min-height: 32px;
+}
+QScrollBar::handle:vertical:hover { background: $fg_faint; }
+QScrollBar::add-line, QScrollBar::sub-line { height: 0; width: 0; }
+QScrollBar::add-page, QScrollBar::sub-page { background: transparent; }
+
+QScrollBar:horizontal {
+    background: transparent;
+    height: 12px;
+    margin: 0;
+}
+QScrollBar::handle:horizontal {
+    background: $border_strong;
+    border-radius: ${radius_sm}px;
+    min-width: 32px;
+}
+
+/* 2. type ----------------------------------------------------------------- */
+
+QLabel[role="caption"] { font-size: ${type_caption}pt; }
+QLabel[role="body"]    { font-size: ${type_body}pt; }
+QLabel[role="subtitle"] {
+    font-size: ${type_subtitle}pt;
+    font-weight: 600;
+}
+QLabel[role="title"] {
+    font-size: ${type_title}pt;
+    font-weight: 600;
+}
+QLabel[role="verdict"] {
+    font-size: ${type_verdict}pt;
+    font-weight: 700;
+}
+QLabel[role="mono"] {
+    font-family: "DejaVu Sans Mono", "Menlo", "Consolas", monospace;
+    font-size: ${type_caption}pt;
+}
+
+/* 3. tone ----------------------------------------------------------------- */
+/* Semantic, never a colour name, so one rule serves both schemes. */
+
+*[tone="muted"] { color: $fg_muted; }
+*[tone="faint"] { color: $fg_faint; }
+*[tone="ok"]    { color: $status_ok; }
+*[tone="warn"]  { color: $status_warn; }
+*[tone="bad"]   { color: $status_bad; }
+*[tone="accent"] { color: $accent_default; }
+
+/* 4. shells --------------------------------------------------------------- */
+
+QFrame#card {
+    background-color: $bg_surface;
+    border: 1px solid $border_default;
+    border-radius: ${radius_md}px;
+}
+
+QFrame#banner {
+    border: 1px solid $border_default;
+    border-radius: ${radius_sm}px;
+    padding: ${space_sm}px;
+}
+QFrame#banner[tone="ok"]   { background-color: $status_ok_bg;   border-color: $status_ok; }
+QFrame#banner[tone="warn"] { background-color: $status_warn_bg; border-color: $status_warn; }
+QFrame#banner[tone="bad"]  { background-color: $status_bad_bg;  border-color: $status_bad; }
+
+QGroupBox {
+    background-color: $bg_surface;
+    border: 1px solid $border_default;
+    border-radius: ${radius_md}px;
+    margin-top: ${space_md}px;
+    padding: ${space_lg}px ${space_md}px ${space_md}px ${space_md}px;
+}
+/* The weight belongs to the title, not to the box: QGroupBox's font cascades into every child,
+ * and a bold explanatory paragraph inside a card is not what anyone meant. */
+QGroupBox::title {
+    font-weight: 600;
+    subcontrol-origin: margin;
+    subcontrol-position: top left;
+    left: ${space_md}px;
+    padding: 0 ${space_xs}px;
+    color: $fg_muted;
+}
+
+/* 5. controls ------------------------------------------------------------- */
+
+QPushButton {
+    background-color: $bg_surface;
+    color: $fg_default;
+    border: 1px solid $border_strong;
+    border-radius: ${radius_sm}px;
+    padding: ${space_sm}px ${space_lg}px;
+    min-height: ${space_lg}px;
+}
+QPushButton:hover   { background-color: $bg_hover; }
+QPushButton:pressed { background-color: $border_default; }
+QPushButton:focus   { border-color: $border_focus; }
+QPushButton:disabled {
+    color: $fg_faint;
+    border-color: $border_default;
+}
+
+QPushButton[variant="primary"] {
+    background-color: $accent_default;
+    color: $fg_on_accent;
+    border-color: $accent_default;
+    font-weight: 600;
+}
+QPushButton[variant="primary"]:hover   { background-color: $accent_hover; border-color: $accent_hover; }
+QPushButton[variant="primary"]:pressed { background-color: $accent_pressed; border-color: $accent_pressed; }
+QPushButton[variant="primary"]:disabled {
+    background-color: $border_default;
+    color: $fg_faint;
+    border-color: $border_default;
+}
+
+QPushButton[variant="quiet"] {
+    background-color: transparent;
+    border-color: transparent;
+    color: $accent_default;
+}
+QPushButton[variant="quiet"]:hover { background-color: $bg_hover; }
+
+QLineEdit, QPlainTextEdit, QComboBox, QAbstractSpinBox {
+    background-color: $bg_surface;
+    color: $fg_default;
+    border: 1px solid $border_strong;
+    border-radius: ${radius_sm}px;
+    padding: ${space_sm}px;
+    selection-background-color: $accent_default;
+    selection-color: $fg_on_accent;
+}
+QLineEdit:focus, QPlainTextEdit:focus, QComboBox:focus, QAbstractSpinBox:focus {
+    border-color: $border_focus;
+}
+/* QAbstractSpinBox covers QSpinBox and QDoubleSpinBox. Without it a spin box fell through
+   to whatever Fusion draws, which barely dims when disabled, so a control that had been
+   greyed out on purpose still read as available beside a combo that plainly did not. */
+QLineEdit:disabled, QComboBox:disabled, QAbstractSpinBox:disabled {
+    background-color: $bg_sunken;
+    color: $fg_faint;
+    border-color: $border_default;
+}
+QPlainTextEdit { background-color: $bg_sunken; }
+
+QComboBox::drop-down { border: none; width: ${space_xl}px; }
+QComboBox QAbstractItemView {
+    background-color: $bg_surface;
+    border: 1px solid $border_default;
+    selection-background-color: $accent_default;
+    selection-color: $fg_on_accent;
+    outline: none;
+}
+
+QCheckBox, QRadioButton { spacing: ${space_sm}px; }
+QCheckBox:disabled, QRadioButton:disabled { color: $fg_faint; }
+
+/* Drawn here rather than by the style. Measured: Fusion derives the indicator's outline itself,
+ * no QPalette role changes it, and an unchecked ring landed at 2.09:1 against the surface, under
+ * the 3:1 WCAG 1.4.11 asks of a control boundary. border.strong is 3.2:1 by construction.
+ * Once ::indicator is styled at all, the checked state needs its own mark, which is what the two
+ * baked-colour check files are for: QSS cannot tint an image. */
+QCheckBox::indicator, QRadioButton::indicator {
+    width: 15px;
+    height: 15px;
+    background-color: $bg_surface;
+    border: 1px solid $border_strong;
+}
+QCheckBox::indicator { border-radius: 3px; }
+QRadioButton::indicator { border-radius: 8px; }
+
+QCheckBox::indicator:hover, QRadioButton::indicator:hover { border-color: $accent_default; }
+QCheckBox::indicator:focus, QRadioButton::indicator:focus { border-color: $border_focus; }
+
+QCheckBox::indicator:checked {
+    background-color: $accent_default;
+    border-color: $accent_default;
+    image: url($icon_check_on_accent);
+}
+QRadioButton::indicator:checked {
+    background-color: $accent_default;
+    border-color: $accent_default;
+    /* A ring rather than a tick: the inset is what makes a radio read as a radio. */
+    border-width: 4px;
+}
+QCheckBox::indicator:disabled, QRadioButton::indicator:disabled {
+    background-color: $bg_sunken;
+    border-color: $border_default;
+}
+
+QListWidget {
+    background-color: $bg_surface;
+    border: 1px solid $border_default;
+    border-radius: ${radius_sm}px;
+    outline: none;
+}
+QListWidget::item { padding: ${space_sm}px; }
+QListWidget::item:selected {
+    background-color: $accent_subtle;
+    color: $fg_default;
+}
+
+/* Thin and textless. It sits under a banner that already says what is happening, and its job
+ * is only to show that something still is. */
+QProgressBar {
+    background-color: $bg_sunken;
+    border: none;
+    border-radius: 2px;
+}
+QProgressBar::chunk {
+    background-color: $accent_default;
+    border-radius: 2px;
+}
+
+/* 6. the app's own pieces -------------------------------------------------- */
+
+/* The sidebar. Sunken rather than raised: the screen beside it is where the work happens, and
+ * the navigation should read as the edge of the window rather than as a panel on top of it. */
+QWidget#sidebar {
+    background-color: $bg_sunken;
+    border-right: 1px solid $border_default;
+}
+
+/* Flat, because it is not a list of data sitting on a surface, it is the window's own chrome. */
+QListWidget#nav {
+    background: transparent;
+    border: none;
+    outline: none;
+}
+QListWidget#nav::item {
+    padding: ${space_sm}px;
+    border-radius: ${radius_sm}px;
+    color: $fg_muted;
+}
+QListWidget#nav::item:hover { background-color: $bg_hover; }
+QListWidget#nav::item:selected {
+    background-color: $accent_subtle;
+    color: $fg_default;
+    font-weight: bold;
+}
+
+/* Ajustes at the foot of the sidebar. Reads as one more destination, not as a button that
+ * commits to something. */
+QPushButton#navAction {
+    background: transparent;
+    border: none;
+    border-radius: ${radius_sm}px;
+    padding: ${space_sm}px;
+    text-align: left;
+    color: $fg_muted;
+}
+QPushButton#navAction:hover { background-color: $bg_hover; color: $fg_default; }
+QPushButton#navAction:focus { border: 1px solid $border_focus; }
+
+/* One line of identity across the foot of the window: what this program is not. The same
+ * sunken tone as the sidebar, because it is chrome rather than content, and never a status
+ * colour: it informs, it does not warn. */
+QWidget#disclaimer {
+    background-color: $bg_sunken;
+    border-top: 1px solid $border_default;
+}
+
+QFrame#dropArea {
+    background-color: $bg_surface;
+    border: 2px dashed $border_strong;
+    border-radius: ${radius_lg}px;
+}
+QFrame#dropArea[state="over"] {
+    border-color: $accent_default;
+    background-color: $accent_subtle;
+}
+QFrame#dropArea:focus { border-color: $border_focus; }
+
+QToolButton#collapsibleToggle {
+    border: none;
+    background: transparent;
+    color: $fg_muted;
+    padding: ${space_xs}px 0;
+}
+QToolButton#collapsibleToggle:hover { color: $accent_default; }
+
+QMenuBar { background-color: $bg_app; }
+QMenuBar::item:selected { background-color: $accent_subtle; }
+QMenu {
+    background-color: $bg_surface;
+    border: 1px solid $border_default;
+    padding: ${space_xs}px;
+}
+QMenu::item { padding: ${space_xs}px ${space_lg}px; }
+QMenu::item:selected { background-color: $accent_subtle; }
+QMenu::separator { height: 1px; background: $border_default; margin: ${space_xs}px 0; }
+
+QToolTip {
+    background-color: $bg_surface;
+    color: $fg_default;
+    border: 1px solid $border_strong;
+    border-radius: ${radius_sm}px;
+    padding: ${space_xs}px;
+}

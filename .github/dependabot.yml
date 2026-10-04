@@ -1,0 +1,46 @@
+# Dependabot configuration for FirmaUY Desktop.
+# https://docs.github.com/code-security/dependabot/dependabot-version-updates
+#
+# This matters more here than it does for the library this app is built on, and the reason is
+# uv.lock. firmauy publishes a wheel, so whoever installs it resolves dependencies fresh and picks
+# up a fixed version on their own. This app freezes: the PyInstaller build reads uv.lock, so
+# whatever is pinned on the day of the build is what every executable runs, for good.
+#
+# That is not hypothetical. GHSA-g6cj-pr64-35w5 affected cryptography 44.0.0 through 49.0.0, and
+# this lock pinned 49.0.0. It was caught by hand. This is what would have said so first.
+version: 2
+updates:
+  # Python dependencies. Dependabot follows uv.lock and pyproject.toml, regenerating the lockfile
+  # with `uv lock --upgrade-package` under the hood.
+  - package-ecosystem: "uv"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    groups:
+      # One PR for all minor and patch bumps, to cut noise and CI runs. Major bumps still arrive
+      # as individual PRs so each one gets reviewed on its own. PySide6 in particular: a major
+      # bump changes the toolkit the whole app is drawn with.
+      python-minor-patch:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
+    ignore:
+      # Every pyhanko[pkcs11] release so far requires python-pkcs11 below 0.10, so a bump past it
+      # cannot resolve. Here it is an indirect dependency, which version updates leave alone by
+      # default, so this guards the day an `allow` rule widens them, the same rule firmauy keeps.
+      # Drop it once pyHanko relaxes the pin.
+      - dependency-name: "python-pkcs11"
+        versions: [">=0.10"]
+
+  # The actions the CI workflow runs. A pinned action is a dependency like any other.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    groups:
+      github-actions:
+        patterns:
+          - "*"

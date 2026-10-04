@@ -1,0 +1,24 @@
+[Desktop Entry]
+Type=Application
+Name=FirmaUY Desktop
+GenericName=Firma digital
+Comment=Firmá y verificá documentos con tu cédula uruguaya
+Exec=firmauy-desktop
+Icon=com.firmauy.firmauydesktop
+Terminal=false
+Categories=Office;
+Keywords=firma;firmar;verificar;cédula;PAdES;XAdES;CAdES;PDF;
+StartupNotify=true
+
+# One main category, which is what desktop-file-validate asks for: Utility and Office are both
+# main categories and listing two puts the application in the menu twice, while Security is an
+# additional category that has to travel with Settings or System, neither of which describes an
+# application for signing documents. Office does, and Keywords carries the rest of the searching.
+#
+# Deliberately not here yet: MimeType and an Exec that takes %F. Declaring either would put this
+# application in the "open with" list for PDFs, and app.py reads no positional file out of argv,
+# so a double click would open an empty window and drop the document on the floor. The association
+# goes in the day the app can act on what it is handed, not before.
+#
+# The base name of this file is settings.APP_ID, which is also what setDesktopFileName reports, so
+# the compositor can tie a window to this entry rather than guess. A test holds the three together.

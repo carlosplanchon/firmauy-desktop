@@ -1,0 +1,295 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Third-party actions are pinned to a full commit SHA with the tag they carried beside it, which is
+# what GitHub asks for: a tag is a name its owner can move, and moving it changes what runs here on
+# the next push without anything in this file changing. The comment is what makes an upgrade
+# reviewable, since a bare forty-character hash says nothing about what it is.
+#
+# Nothing here may quietly relock. Measured: with pyproject and uv.lock out of step, `uv sync`
+# rewrote the lockfile and carried on, so a build could use dependencies that are in no commit.
+# UV_LOCKED turns that into an error, exit 1, with the lockfile untouched. It belongs in the
+# everyday CI as well as in the release, so the mismatch is found on the push rather than on the tag.
+env:
+  UV_LOCKED: "1"
+
+# Cancel superseded runs on the same ref (e.g. rapid pushes to a PR).
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7  # v10.2.0
+        with:
+          enable-cache: true
+      - name: Ruff
+        run: uvx ruff check
+
+  test:
+    name: tests (py${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # The ends of the declared range (requires-python >= 3.11). The app ships as a frozen
+        # bundle with its own interpreter, so the versions in between add little for the minutes
+        # they cost pulling Qt.
+        python-version: ["3.11", "3.14"]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7  # v10.2.0
+        with:
+          enable-cache: true
+          python-version: ${{ matrix.python-version }}
+
+      # Qt needs these even with the offscreen platform plugin, which the runners lack.
+      # Qt needs the first four even under the offscreen platform plugin. The rest are for
+      # pyscard, which publishes wheels for macOS and Windows only: on Linux it is built from
+      # its sdist, and that needs swig and PC/SC's winscard.h. Declared rather than assumed,
+      # because a runner image that happens to carry a package today can stop tomorrow.
+      - name: Install system libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libegl1 libgl1 libxkbcommon0 libdbus-1-3 \
+            build-essential swig libpcsclite-dev
+
+      - name: Install dependencies
+        run: uv sync
+
+      # The tests mock the backend, so they need no card and no PIN. The widget tests do build
+      # real Qt objects, hence the offscreen platform and the libraries above.
+      - name: Run tests
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: uv run pytest -q
+
+  states:
+    name: every screen in every state
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7  # v10.2.0
+        with:
+          enable-cache: true
+
+      # Qt needs the first four even under the offscreen platform plugin. The rest are for
+      # pyscard, which publishes wheels for macOS and Windows only: on Linux it is built from
+      # its sdist, and that needs swig and PC/SC's winscard.h. Declared rather than assumed,
+      # because a runner image that happens to carry a package today can stop tomorrow.
+      - name: Install system libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libegl1 libgl1 libxkbcommon0 libdbus-1-3 \
+            build-essential swig libpcsclite-dev
+
+      - name: Install dependencies
+        run: uv sync
+
+      # A stronger construction check than the smoke job: it builds every screen in every state
+      # it can be in, headless, and renders each one. A component that cannot survive an empty
+      # list, or a screen that crashes on a partial result, fails here instead of in front of
+      # somebody. The images are an artifact to look at, never a gate: font rendering differs
+      # between machines, and a pixel comparison would go flaky and then be ignored.
+      - name: Render every state
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: uv run python -m tools.storybook --shot shots/ --scheme both
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        with:
+          name: states
+          path: shots/
+          retention-days: 7
+
+  smoke:
+    name: the window opens
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7  # v10.2.0
+        with:
+          enable-cache: true
+
+      # Qt needs these even with the offscreen platform plugin, which the runners lack.
+      # Qt needs the first four even under the offscreen platform plugin. The rest are for
+      # pyscard, which publishes wheels for macOS and Windows only: on Linux it is built from
+      # its sdist, and that needs swig and PC/SC's winscard.h. Declared rather than assumed,
+      # because a runner image that happens to carry a package today can stop tomorrow.
+      - name: Install system libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libegl1 libgl1 libxkbcommon0 libdbus-1-3 \
+            build-essential swig libpcsclite-dev
+
+      - name: Install dependencies
+        run: uv sync
+
+      # The unit tests mock the backend, so nothing else would catch a view that fails to build
+      # (a missing import, a bad Qt enum). Start the real app headless and require that it is
+      # still running when the timeout fires: exit 124 means the event loop came up and stayed up.
+      # This covers construction only. A name that is resolved when a button is clicked, rather
+      # than while the window is built, still gets through, so it does not replace using the app.
+      - name: Start the app headless
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: |
+          set +e
+          timeout 20 uv run firmauy-desktop
+          rc=$?
+          set -e
+          if [ "$rc" -ne 124 ]; then
+            echo "::error::the app exited with $rc instead of staying up (124 = still running)"
+            exit 1
+          fi
+
+  desktop:
+    name: the desktop files are well formed
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+
+      # Both are the validators the specifications themselves point at, so this is the format's
+      # own opinion rather than one invented here. A malformed entry does not fail loudly: it is
+      # skipped, and the application simply never appears in the menu.
+      - name: Install the validators
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends desktop-file-utils appstream
+
+      - name: The desktop entry
+        run: |
+          desktop-file-validate packaging/linux/com.firmauy.firmauydesktop.desktop
+
+      # --no-net on purpose. The network checks fetch every URL and every screenshot, which makes
+      # a green build depend on GitHub answering and on a tag existing, and turns a metadata check
+      # into a flaky one. What is left is the part that is about this file.
+      - name: The AppStream metadata
+        run: |
+          appstreamcli validate --no-net --explain \
+            packaging/linux/com.firmauy.firmauydesktop.metainfo.xml
+
+      - name: The install script is not broken shell
+        run: |
+          for script in packaging/check_bundle.sh packaging/linux/*.sh; do
+            bash -n "$script"
+          done
+
+  bundle:
+    name: the bundle runs
+    # Pinned, and not to "latest", because PyInstaller does not bundle glibc: the binary uses the
+    # one on the machine that runs it, and the libraries collected into it carry the symbol
+    # versions of the machine that built it. Measured on a build host with glibc 2.44: the
+    # bootloader itself needs only 2.14, while the collected system libraries reach 2.43. So
+    # "latest" means the floor moves whenever GitHub moves its image, and nobody would notice
+    # until somebody's older distribution refused to start it.
+    #
+    # 22.04 carries glibc 2.35. The hard floor underneath is PySide6, whose x86_64 wheel is
+    # manylinux_2_34, so this clears it by one release and cannot go much lower.
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+
+      # The interpreter is not a build tool here, it is part of the product: PyInstaller freezes it
+      # into the bundle. Left unsaid, the version people run is whichever one uv felt like
+      # resolving on the day, which is a strange thing not to decide about a signing application.
+      - name: Install uv
+        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7  # v10.2.0
+        with:
+          enable-cache: true
+          python-version: "3.14"
+
+      - name: Install system libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libegl1 libgl1 libxkbcommon0 libdbus-1-3 \
+            build-essential swig libpcsclite-dev \
+            desktop-file-utils
+
+      - name: Install dependencies
+        run: uv sync
+
+      # Everything above this job runs against the source tree. What people are handed is a
+      # frozen bundle, and the two fail in different ways: a dynamic import of firmauy, a
+      # pyhanko plugin, smartcard.*, the bundled CA certificates, certifi, Qt's svg plugin,
+      # package data, a missing hook, or one of the spec's deliberately aggressive excludes.
+      # None of those can go wrong from source, so none of them had a gate.
+      - name: Build it
+        run: uv run pyinstaller --clean --noconfirm packaging/firmauy-desktop.spec
+
+      # The signature the frozen core is asked to read. Generated per run rather than committed,
+      # since a certificate expires and a fixture checked in today would fail this a year from now
+      # on a commit that changed nothing.
+      - name: Make the fixture
+        run: uv run python -m tools.verify_fixture "$RUNNER_TEMP/fixture"
+
+      # Icons, a real signature and a window that stays open, against the tree PyInstaller just
+      # wrote. The script says what each one is for.
+      - name: Check what PyInstaller wrote
+        run: packaging/check_bundle.sh dist/firmauy-desktop "$RUNNER_TEMP/fixture"
+
+      # A tarball rather than the directory, because the directory is not what anybody receives.
+      # upload-artifact zips whatever it is given and documents that zipped uploads do not keep
+      # permissions: directories come back 755 and every file 644. This bundle has 212 executable
+      # files and 43 symbolic links, and PyInstaller's own notes require a onedir build to be
+      # distributed in a format that preserves links. A zip of this directory hands somebody a
+      # binary they cannot run.
+      #
+      # And the archive holds more than the bundle. The instructions that come with it name an
+      # installer, a desktop entry and an AppStream file, and the first version of this packed
+      # none of them: the download could be run and could not be installed, because installing it
+      # meant having a clone of this repository too.
+      - name: Pack it the way it will be handed over
+        run: |
+          packaging/linux/make_release.sh dist/firmauy-desktop "$RUNNER_TEMP/release"
+          rm -rf dist
+
+      # dist/ is gone by now on purpose: a check that can still reach the original tree is a check
+      # that can pass while the artifact is broken. Everything below reads only what came out of
+      # the tarball.
+      - name: Unpack it the way somebody would
+        run: |
+          mkdir -p "$RUNNER_TEMP/unpacked"
+          tar -C "$RUNNER_TEMP/unpacked" -xzf "$RUNNER_TEMP/release"/*.tar.gz
+          echo "RELEASE_DIR=$(echo "$RUNNER_TEMP/unpacked"/*/)" >> "$GITHUB_ENV"
+
+      - name: Check what comes back out of the archive
+        run: packaging/check_bundle.sh "$RELEASE_DIR/firmauy-desktop" "$RUNNER_TEMP/fixture"
+
+      # The half the bundle checks cannot see: that the download carries what its own instructions
+      # name, that the installed entry points at something that exists, that installing twice
+      # leaves the new bundle rather than the union of both, and that removing it removes it. A
+      # throwaway HOME, so the runner is not what is being installed into, and then the --system
+      # branch with sudo, which the runner can afford: what it checks is that /opt is root's.
+      - name: Install it, upgrade it and take it away
+        env:
+          CHECK_SYSTEM_INSTALL: "1"
+        run: packaging/linux/check_install.sh "$RELEASE_DIR"
+
+      # Short retention because it is large and rebuilt on every run, not because it matters
+      # little. No compression on the upload: a zip around a tar.gz is work for nothing.
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        with:
+          name: firmauy-desktop-linux-x86_64
+          path: |
+            ${{ runner.temp }}/release/*.tar.gz
+            ${{ runner.temp }}/release/*.tar.gz.sha256
+          compression-level: 0
+          retention-days: 7

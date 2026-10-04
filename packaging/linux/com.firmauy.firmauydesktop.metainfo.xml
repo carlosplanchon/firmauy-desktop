@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Copyright 2026 Carlos Andrés Planchón Prestes -->
+<!-- Licensed under the Apache License, Version 2.0 -->
+<component type="desktop-application">
+  <id>com.firmauy.firmauydesktop</id>
+  <launchable type="desktop-id">com.firmauy.firmauydesktop.desktop</launchable>
+
+  <name>FirmaUY Desktop</name>
+  <summary>Firmá y verificá documentos con tu cédula uruguaya</summary>
+
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>Apache-2.0</project_license>
+
+  <description>
+    <p>
+      Arrastrá un documento y firmalo con tu cédula. Soltá uno firmado y obtené una respuesta en
+      español, con cada comprobación que la produjo.
+    </p>
+    <p>
+      Firmar y verificar funcionan de forma local y sin conexión. La red se usa únicamente cuando
+      la pedís: el sellado de tiempo al firmar, que envía un resumen y nunca el documento, la
+      consulta de revocación al verificar, que viene apagada, y el botón de Diagnóstico que vuelve
+      a descargar los certificados de las autoridades nacionales. Tu documento sale de tu máquina
+      solamente si decidís subirlo al validador del Estado.
+    </p>
+    <p>
+      La firma se adapta al documento: un PDF vuelve como PDF firmado (PAdES, con firma visible),
+      un XML como XML firmado (XAdES), y cualquier otro archivo como un .p7s aparte (CAdES). Varios
+      archivos se firman en una sola sesión de la tarjeta, así que el PIN se pide una vez para todo
+      el lote.
+    </p>
+    <p>
+      No es una aplicación oficial del Estado uruguayo. Es una herramienta independiente construida
+      sobre las interfaces publicadas de la cédula. Lo que eso deslinda es el software, no la firma:
+      la firma la hace tu propia tarjeta, con el certificado que el Ministerio del Interior le puso.
+    </p>
+    <p>
+      Antes de enviar o confiar en un documento firmado, subilo a firma.gub.uy, el validador del
+      Estado, y guardá su respuesta. Ese es el árbitro que va a usar tu contraparte.
+    </p>
+  </description>
+
+  <!-- The same single category the desktop entry carries. Two lists that disagree is how an
+       application ends up filed in one place and shown in another. -->
+  <categories>
+    <category>Office</category>
+  </categories>
+
+  <url type="homepage">https://github.com/carlosplanchon/firmauy-desktop</url>
+  <url type="bugtracker">https://github.com/carlosplanchon/firmauy-desktop/issues</url>
+  <url type="vcs-browser">https://github.com/carlosplanchon/firmauy-desktop</url>
+
+  <developer id="com.firmauy">
+    <name>Carlos Andrés Planchón Prestes</name>
+  </developer>
+
+  <!-- Every value in these is synthetic and the cardholder photo is a flat rectangle generated at
+       run time. They are rebuilt by tools/screenshots.py rather than captured by hand, which is
+       what keeps that true. The URLs point at the tag so a catalogue does not follow the branch. -->
+  <screenshots>
+    <screenshot type="default">
+      <caption>Verificar un documento firmado</caption>
+      <image>https://raw.githubusercontent.com/carlosplanchon/firmauy-desktop/v0.1.0/docs/screenshots/verificar.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Firmar uno o varios documentos</caption>
+      <image>https://raw.githubusercontent.com/carlosplanchon/firmauy-desktop/v0.1.0/docs/screenshots/firmar.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Leer los datos de la cédula, sin PIN</caption>
+      <image>https://raw.githubusercontent.com/carlosplanchon/firmauy-desktop/v0.1.0/docs/screenshots/mi-cedula.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Diagnóstico del lector y la tarjeta</caption>
+      <image>https://raw.githubusercontent.com/carlosplanchon/firmauy-desktop/v0.1.0/docs/screenshots/diagnostico.png</image>
+    </screenshot>
+  </screenshots>
+
+  <content_rating type="oars-1.1"/>
+
+  <releases>
+    <release version="0.1.0" type="development" date="2026-08-10">
+      <description>
+        <p>Primera versión. Firmar, verificar, leer la cédula y diagnosticar el entorno.</p>
+      </description>
+    </release>
+  </releases>
+</component>

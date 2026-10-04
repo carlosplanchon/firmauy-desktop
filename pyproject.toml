@@ -1,0 +1,146 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "firmauy-desktop"
+version = "0.1.0"
+description = "Desktop app to sign and verify documents with the Uruguayan eID (cédula), built on firmauy."
+readme = "README.md"
+requires-python = ">=3.11"
+license = "Apache-2.0"
+dependencies = [
+    # 1.20.0 is the floor, and it is about telling apart two refusals that need opposite answers.
+    # Below it a malformed PIN and a card on its last try were the same bare PinError, so the app
+    # told them apart by whether its prompt had run, which the direct path gets wrong when it
+    # counts the tries again after the prompt and finds one left. 1.20.0 raises PinFormatError
+    # and PinLastTryError instead. Its cédula check also stopped reading digits from other
+    # scripts, and its urllib3 floor is the 2.8.0 this file asks for below.
+    #
+    # 1.19.0 before it, about what the app can say when a timestamp does not come back. Below it
+    # every TSA failure arrived as pyHanko's TimestampRequestError, an OSError from outside
+    # firmauy.api, so the app could only call it a failure it did not recognise, in English,
+    # quoting a command-line flag nobody has here. 1.19.0 raises TimestampError instead, with
+    # TimestampDestinationRefusedError for a TSA on a refused address and whether the box in
+    # Ajustes can reach it, and it reads a TSA's refusal rather than failing to parse it.
+    #
+    # 1.18.0 before it because of the pyHanko it resolves with. pyHanko 0.37 moved to aiohttp
+    # and made requests optional, and up to 1.17.1 the TSA client imported requests without
+    # declaring it, so a lock that moved pyHanko alone resolved cleanly and could not timestamp:
+    # what 1.17.2 shipped as "--tsa-url works on a fresh install again". 1.18.0 declares requests
+    # and urllib3 itself. It also sends the TSA request and the revocation fetches to public
+    # addresses only, so a TSA on a private network is refused unless allow_private_network says
+    # otherwise, which "Permitir servidores de la red local" in Ajustes does.
+    #
+    # 1.17.1 before it was about what ships rather than what runs, like 1.14.3. Below it the
+    # stamp image is embedded at whatever resolution it arrives with, into a box 205 by 70 points
+    # across: measured upstream, a 3000x2000 photo produced a 15 MB appearance, and that
+    # appearance then sits inside every PDF signed with it.
+    #
+    # 1.17.0 before it brought StampCorner, so Ajustes can offer the four corners of the page. Below
+    # it the only way to move the stamp is absolute coordinates, and those cannot be turned into
+    # a corner without the page size, which no public call reports. That is why the corner combo
+    # could not exist here until the core learned to resolve it against the real MediaBox.
+    #
+    # 1.16.0 before it brought PdfAppearance, which is what lets Ajustes decide what the visible
+    # stamp on a PDF says. Below that the stamp is five fixed lines, unreachable from here.
+    #
+    # 1.15.0 before it re-exported SignAs from firmauy.api, which was the last name this app
+    # imported from firmauy.constants. Below that, one import is the only thing reaching past the
+    # public module, so this floor is also what turns "everything comes in through firmauy.api"
+    # from an intention into a fact.
+    #
+    # 1.14.3 raised firmauy's own cryptography floor past GHSA-g6cj-pr64-35w5. That one is about
+    # what ships rather than what runs: the PyInstaller build freezes from uv.lock, so a vulnerable
+    # version pinned there would sit inside every executable for good.
+    #
+    # 1.14.0 separated the three states a failed signature can leave an output in, which this app
+    # renders as three different instructions: nothing was written, it was written and its
+    # permissions are not what they should be, it was written and its own check did not pass.
+    #
+    # 1.13.1 before that: below it, a file whose timestamp token is malformed raises out of the
+    # verifier instead of coming back INDETERMINATE, so the app has nothing to say about the
+    # document beyond that something went wrong in a way it does not recognise. A dead end for
+    # somebody who only wants to know whether the signature holds. 1.13.1 answers instead.
+    #
+    # 1.13.0 before it, over wording rather than a feature. Up to 1.12.1 a broken
+    # timestamp on a PDF or a .p7s came back as "the timestamp token is broken"; 1.13.0 sends the
+    # specific reason instead and dropped that phrase, so the gloss for it went too. Against an
+    # older core that row would reach a Spanish screen in English, which is the one kind of
+    # degradation this app does not accept: everywhere else a missing gloss costs a sentence
+    # nobody translated yet, but here the sentence is the whole answer.
+    #
+    # 1.12.0 reported the signature timestamp for every format, where PDF and detached CMS used to
+    # discard it, and stopped calling a file VALID over a broken token. 1.11.0 added
+    # should_continue, which is what makes the Cancelar button on a long batch real; 1.10.0 brought
+    # DetachedOriginalRequiredError (the last condition this app had to detect by matching English
+    # message text), BatchSignError, sign_files' progress callback and output_path_for; 1.9.0 the
+    # `sensitive` flag on a doctor check.
+    # The cap is a backstop against a 2.0 rewrite and not a compatibility guarantee: firmauy's own
+    # docs/api.md says the API is young and cites 1.7.0 renaming verify_file to verify, so it has
+    # already broken inside 1.x once and a `<2` would not have caught it. What actually pins what
+    # ships is uv.lock, which the PyInstaller build freezes from. This bound only binds someone
+    # installing from a clone without the lock. The day this is published as a wheel that stops
+    # being true, and the honest bound becomes the minor that was actually tested, `<1.21` today,
+    # raised deliberately after CI rather than left open. That number tracks the floor below, so
+    # it is written here as a rule rather than as a figure to keep in step by hand.
+    "firmauy>=1.20.0,<2",
+    # Explicit, though firmauy already pulls it in through requests. It is the bundle of public
+    # roots a signature timestamp is judged against when the user has not named their own, so an
+    # upstream dependency dropping it would take a verification option down with it, not a
+    # transitive detail.
+    "certifi",
+    # Nothing here imports it, and the floor is still this app's to state. It carries both
+    # connections firmauy opens, the TSA request and the revocation fetches, and the second reaches
+    # whatever URLs a certificate in somebody else's file names. 2.7.0, which the lock held before,
+    # could be made by the server at one of them to buffer a chunk-size line of any length
+    # (GHSA-vxq7-64xx-v4gw) or to loop forever inflating a chunked deflate body
+    # (GHSA-gh4c-6fx4-qh6g). Both live in the streaming read firmauy uses so it can count bytes,
+    # below the point where its limit counts anything. A third, GHSA-8988-9cw3-xx77, let a
+    # destination's TLS settings override an HTTPS proxy's, and firmauy honours the proxy the
+    # environment names. firmauy asks for the same from 1.20.0, the floor above, and up to 1.19.0
+    # only for >=2.6, when nothing but uv.lock kept 2.8.0. Stated here as well, like certifi, so
+    # the reason sits where the version is chosen and does not hang on a line in someone else's
+    # pyproject.
+    "urllib3>=2.8.0",
+    "PySide6>=6.7",
+]
+
+[project.scripts]
+firmauy-desktop = "firmauy_desktop.app:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+# The window icon and the artwork ship with the package, so an installed copy has them too and
+# not only a build from the checkout.
+#
+# The nested line is not redundant: "assets/*" does not descend, so the seventeen SVGs of the
+# icon set were left out of the wheel while a source checkout and a PyInstaller build both found
+# them on disk. The only thing that would have shown it is installing the wheel, which nothing
+# did. A test compares these patterns against every file under assets/ so a new directory cannot
+# go missing the same way.
+firmauy_desktop = ["assets/*", "assets/icons/*"]
+
+[dependency-groups]
+# pytest-qt is dev only and never reaches the PyInstaller bundle. It earns its place three ways:
+# qtbot.waitSignal is the sane way to await a QThread round trip, it keeps the one-QApplication-
+# per-process rule (the classic reason a hand-rolled Qt suite segfaults on the second file), and
+# it turns an exception raised inside a slot into a test failure instead of a line on stderr that
+# pytest happily ignores. This app's core logic runs in worker-thread callbacks, so that last one
+# alone pays for it.
+dev = ["pyinstaller>=6", "pytest>=8", "pytest-qt>=4", "ruff"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# So the suite and the storybook import tools/ the same way. tools/ lives outside src/, which
+# is what makes it structurally impossible to package: packages.find only looks in src/.
+pythonpath = ["."]
+
+[tool.ruff.lint]
+# Select the classic default ruleset explicitly (pyflakes + a pycodestyle subset) so linting stays
+# deterministic across ruff releases. An unpinned `uvx ruff check` follows whatever defaults ruff
+# ships that week: 0.16 widened its implicit default and turned a green CI into thousands of
+# findings overnight.
+select = ["E4", "E7", "E9", "F"]
