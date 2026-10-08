@@ -293,3 +293,117 @@ jobs:
             ${{ runner.temp }}/release/*.tar.gz.sha256
           compression-level: 0
           retention-days: 7
+
+  test-windows:
+    name: tests on Windows (py${{ matrix.python-version }})
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.14"]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7  # v10.2.0
+        with:
+          enable-cache: true
+          python-version: ${{ matrix.python-version }}
+
+      # No system libraries: pyscard publishes Windows wheels, and PC/SC is part of Windows.
+      - name: Install dependencies
+        run: uv sync
+
+      # Offscreen like Linux. conftest points the plugin at the system fonts, which on Windows it
+      # does not find by itself, so the layout tests measure what a person would see.
+      - name: Run tests
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: uv run pytest -q
+
+  bundle-windows:
+    name: the Windows bundle runs, installs and uninstalls
+    # Pinned for the same reason as the Linux bundle, though the stake is different: there is no
+    # glibc here to raise a floor, but an image moving under the build changes what is in it
+    # (Inno Setup among them) without anything in this file changing.
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+
+      # The interpreter is part of the product: PyInstaller freezes it into the bundle.
+      - name: Install uv
+        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7  # v10.2.0
+        with:
+          enable-cache: true
+          python-version: "3.14"
+
+      - name: Install dependencies
+        run: uv sync
+
+      # Preinstalled on the image today. Declared rather than assumed, because a runner image that
+      # happens to carry a tool today can stop tomorrow.
+      - name: Inno Setup
+        run: |
+          if (-not (Test-Path "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe")) {
+            choco install innosetup --no-progress -y
+          }
+
+      - name: The version
+        run: |
+          $init = Get-Content src/firmauy_desktop/__init__.py -Raw
+          if ($init -notmatch '(?m)^__version__ = "([^"]+)"') { throw "sin __version__" }
+          "VERSION=$($Matches[1])" >> $env:GITHUB_ENV
+
+      - name: Build it
+        run: uv run pyinstaller --clean --noconfirm packaging/firmauy-desktop.spec
+
+      - name: Make the fixture
+        run: uv run python -m tools.verify_fixture "$env:RUNNER_TEMP\fixture"
+
+      # The same questions as check_bundle.sh, less the two a Windows tree cannot get wrong, plus
+      # the version resource Explorer reads.
+      - name: Check what PyInstaller wrote
+        run: >
+          packaging/windows/check_bundle.ps1 -Root dist/firmauy-desktop
+          -Fixture "$env:RUNNER_TEMP\fixture" -Version $env:VERSION
+
+      # A zip and an installer, each with its .sha256. dist/ goes right after, for the reason it
+      # goes on Linux: a check that can still reach the original tree can pass while the artifact
+      # is broken.
+      - name: Pack it the way it will be handed over
+        run: |
+          packaging/windows/make_release.ps1 -Bundle dist/firmauy-desktop -Out "$env:RUNNER_TEMP\release"
+          Remove-Item dist -Recurse -Force
+
+      # Expand-Archive, which is what Explorer's "Extraer todo" amounts to, rather than the tar
+      # that made the zip: the question is whether somebody else's unzipper gets a working tree.
+      - name: Unzip it the way somebody would
+        run: |
+          Expand-Archive "$env:RUNNER_TEMP\release\*.zip" -DestinationPath "$env:RUNNER_TEMP\unpacked"
+          $dir = (Get-ChildItem "$env:RUNNER_TEMP\unpacked" -Directory | Select-Object -First 1).FullName
+          "RELEASE_DIR=$dir" >> $env:GITHUB_ENV
+
+      - name: Check what comes back out of the zip
+        run: >
+          packaging/windows/check_bundle.ps1 -Root "$env:RELEASE_DIR\firmauy-desktop"
+          -Fixture "$env:RUNNER_TEMP\fixture" -Version $env:VERSION
+
+      # The installer's half: a Start menu entry that points at a working bundle, an upgrade that
+      # replaces rather than merges, and an uninstall that removes what it installed and leaves
+      # the person's settings.
+      - name: Install it, upgrade it and take it away
+        run: >
+          packaging/windows/check_install.ps1
+          -Setup (Get-Item "$env:RUNNER_TEMP\release\*-setup.exe").FullName
+          -Fixture "$env:RUNNER_TEMP\fixture"
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        with:
+          name: firmauy-desktop-windows-x86_64
+          path: |
+            ${{ runner.temp }}/release/*.zip
+            ${{ runner.temp }}/release/*.zip.sha256
+            ${{ runner.temp }}/release/*-setup.exe
+            ${{ runner.temp }}/release/*-setup.exe.sha256
+          compression-level: 0
+          retention-days: 7

@@ -38,6 +38,7 @@ from firmauy_desktop.views.identity_view import IdentityView
 from firmauy_desktop.views.settings_dialog import open_settings
 from firmauy_desktop.views.sign_view import SignView
 from firmauy_desktop.views.verify_view import VerifyView
+from firmauy_desktop.widgets import native_path
 
 _DEFAULT_SIZE = (900, 700)
 # Wider than it was: a 200 point sidebar has to come off the reading area, not out of it. The
@@ -319,13 +320,13 @@ class MainWindow(QMainWindow):
         path, _ = QFileDialog.getOpenFileName(self, "Elegir el archivo a firmar")
         if path:
             self.go_to("sign")
-            self._sign.load(path)
+            self._sign.load(native_path(path))
 
     def _pick_to_verify(self) -> None:
         path, _ = QFileDialog.getOpenFileName(self, "Elegir el archivo firmado")
         if path:
             self.go_to("verify")
-            self._verify.load(path)
+            self._verify.load(native_path(path))
 
     # --- geometry -----------------------------------------------------------
 

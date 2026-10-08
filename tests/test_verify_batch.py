@@ -255,7 +255,7 @@ def test_a_row_missing_its_original_re_verifies_only_that_row(make_view, qtbot, 
     with qtbot.waitSignal(view._runner.finished, timeout=5000):
         view._pick_original()
 
-    assert fake_backend.kwargs_for("verify_file")["original"] == "/tmp/suelto"
+    assert fake_backend.kwargs_for("verify_file")["original"] == str(Path("/tmp/suelto"))
     assert view._files.item(1).data(Qt.ItemDataRole.UserRole) == "valid"
     assert view._files.item(0).data(Qt.ItemDataRole.UserRole) == "valid"    # untouched
     assert "Los 2: VÁLIDOS" in widget_text(view._answer)                    # recounted

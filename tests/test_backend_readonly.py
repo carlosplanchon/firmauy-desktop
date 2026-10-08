@@ -112,7 +112,10 @@ def test_refresh_cas_returns_the_paths_and_forwards_progress(monkeypatch):
 
     result = backend.refresh_cas(progress=steps.append)
     assert result.ok is True
-    assert result.value == backend.CaPaths("/c/acrn.cer", "/c/mica.cer", "/c")
+    # Through Path, because that is what firmauy hands over: on Windows "/c/acrn.cer" reads back
+    # as "\c\acrn.cer", and what is being checked is that the paths arrive, not how they are spelt.
+    assert result.value == backend.CaPaths(str(Path("/c/acrn.cer")), str(Path("/c/mica.cer")),
+                                           str(Path("/c")))
     assert steps == ["bajando la raíz", "bajando la intermedia"]
 
 

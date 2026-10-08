@@ -9,11 +9,47 @@
 # excludes below are the safety net that keeps those heavy, unused Qt modules out.
 
 import os
+import re
+import sys
 
 from PyInstaller.utils.hooks import collect_all, collect_data_files, collect_submodules
 
 entry = os.path.join(SPECPATH, "entry.py")
 src = os.path.normpath(os.path.join(SPECPATH, "..", "src"))
+
+
+def _windows_version_info():
+    """The version resource Windows reads off the .exe: Explorer's Properties tab, Task Manager's
+    name for the process, and the first thing an antivirus heuristic looks at. An executable with
+    none reads as anonymous, which is a poor look for a program that asks for a PIN.
+
+    Built from __version__ rather than written here, so the spec does not grow a fourth copy of
+    the version for test_the_version_says_the_same_thing_in_all_three_places to chase.
+    """
+    from PyInstaller.utils.win32.versioninfo import (
+        FixedFileInfo, StringFileInfo, StringStruct, StringTable, VarFileInfo, VarStruct,
+        VSVersionInfo,
+    )
+
+    with open(os.path.join(src, "firmauy_desktop", "__init__.py"), encoding="utf-8") as f:
+        version = re.search(r'^__version__ = "([^"]+)"', f.read(), re.MULTILINE).group(1)
+    # The binary field takes four integers. A suffix such as "rc1" stays in the strings below.
+    numbers = tuple(int(n) for n in re.match(r"(\d+)\.(\d+)\.(\d+)", version).groups()) + (0,)
+    strings = [
+        StringStruct("ProductName", "FirmaUY Desktop"),
+        StringStruct("FileDescription", "FirmaUY Desktop"),
+        StringStruct("ProductVersion", version),
+        StringStruct("FileVersion", version),
+        StringStruct("InternalName", "firmauy-desktop"),
+        StringStruct("OriginalFilename", "firmauy-desktop.exe"),
+        StringStruct("LegalCopyright", "Copyright 2026 Carlos Andrés Planchón Prestes. Apache-2.0."),
+        StringStruct("Comments", "Proyecto independiente, sin afiliación con AGESIC."),
+    ]
+    return VSVersionInfo(
+        ffi=FixedFileInfo(filevers=numbers, prodvers=numbers),
+        kids=[StringFileInfo([StringTable("040904B0", strings)]),
+              VarFileInfo([VarStruct("Translation", [0x0409, 1200])])],
+    )
 
 datas = []
 binaries = []
@@ -85,6 +121,7 @@ exe = EXE(
     # Windows reads the executable's icon from here (the .ico carries every size it asks for).
     # Ignored on Linux, where the desktop entry points at the PNG instead.
     icon=os.path.join(src, "firmauy_desktop", "assets", "icon.ico"),
+    version=_windows_version_info() if sys.platform == "win32" else None,
 )
 
 coll = COLLECT(

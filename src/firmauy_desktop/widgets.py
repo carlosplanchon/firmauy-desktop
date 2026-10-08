@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from PySide6.QtCore import QSize, Qt, QUrl, Signal
+from PySide6.QtCore import QDir, QSize, Qt, QUrl, Signal
 from PySide6.QtGui import QDesktopServices, QDragEnterEvent, QDropEvent
 from PySide6.QtWidgets import (
     QFileDialog,
@@ -26,6 +26,17 @@ from firmauy_desktop.ui import components, icons, tokens
 from firmauy_desktop.ui.theming import theme
 
 
+def native_path(path: str) -> str:
+    """A path Qt handed over, with the separators this system writes.
+
+    Qt speaks ``/`` on every platform, so on Windows a drop or a file dialog yields
+    ``C:/Users/ana/contrato.pdf``. Python and firmauy accept that, but it is not how Windows
+    writes a path, and it reached the screen that way. Only the separators change: no ``..`` is
+    resolved and no link followed, so on Linux and macOS this returns the path untouched.
+    """
+    return QDir.toNativeSeparators(path) if path else path
+
+
 def local_files(urls) -> list[str]:
     """The dropped URLs that are actually files on this machine.
 
@@ -34,7 +45,7 @@ def local_files(urls) -> list[str]:
     """
     paths = []
     for url in urls:
-        local = url.toLocalFile()
+        local = native_path(url.toLocalFile())
         if local and Path(local).is_file():
             paths.append(local)
     return paths
@@ -146,9 +157,10 @@ class DropArea(QFrame):
     def _on_browse(self) -> None:
         if self._multiple:
             paths, _ = QFileDialog.getOpenFileNames(self, "Elegir archivos")
+            paths = [native_path(path) for path in paths]
         else:
             path, _ = QFileDialog.getOpenFileName(self, "Elegir archivo")
-            paths = [path] if path else []
+            paths = [native_path(path)] if path else []
         if paths:
             self._set_files(paths)
 

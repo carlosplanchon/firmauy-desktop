@@ -16,6 +16,14 @@ import os
 # `pytest` by hand should not have windows flashing past, and a machine with no display should
 # not fail to collect.
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+# On Windows the offscreen plugin has no font database of its own: it looks in Qt's own fonts
+# folder, finds nothing, and measures every font, monospace included, as one wide fallback.
+# Measured: a sha256 in the mono role came out at 640 px offscreen, against 384 px with the real
+# Windows platform (320 px in Consolas). Pointed at the system's fonts, offscreen measures what a
+# person would see, and the layout tests ask about this platform rather than about a missing one.
+if os.name == "nt":
+    os.environ.setdefault("QT_QPA_FONTDIR", os.path.join(os.environ.get("WINDIR", r"C:\Windows"),
+                                                         "Fonts"))
 
 import pytest                                   # noqa: E402
 from PySide6.QtCore import QSettings            # noqa: E402

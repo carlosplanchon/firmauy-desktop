@@ -38,7 +38,8 @@ from firmauy_desktop.labels import unexpected
 from firmauy_desktop.pinflow import PinHandshake
 from firmauy_desktop.tasks import CardLock, Deadline, TaskRunner
 from firmauy_desktop.ui import components as c
-from firmauy_desktop.widgets import Collapsible, DropArea, FileListWidget, ValidatorRow
+from firmauy_desktop.widgets import (Collapsible, DropArea, FileListWidget, ValidatorRow,
+                                     native_path)
 
 _OWNER = "firmando"
 
@@ -239,7 +240,7 @@ class SignView(c.Screen):
     def _pick_output_dir(self) -> None:
         folder = QFileDialog.getExistingDirectory(self, "Elegir dónde guardar")
         if folder:
-            self._output_dir.setText(folder)
+            self._output_dir.setText(native_path(folder))
 
     # --- signing ------------------------------------------------------------
 
