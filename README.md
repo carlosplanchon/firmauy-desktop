@@ -107,7 +107,8 @@ document:
 - **Uploading to firma.gub.uy** to cross-check a signature, in your browser rather than from
   the app. The step recommended above, and the only one that sends the document itself, to a
   State-operated service.
-- **Timestamping**, when a TSA URL is set in Ajustes. What is sent is a hash, never the document.
+- **Timestamping**, when a TSA URL is set in Ajustes or, for one document, under Opciones
+  avanzadas in Firmar. What is sent is a hash, never the document.
 - **Checking whether a certificate was revoked**, when it is turned on in Verificar. Off by
   default, and it is the only part of verification that is not offline.
 - **"Actualizar certificados" in Diagnóstico**, which re-downloads the national CA certificates
@@ -126,8 +127,9 @@ What the app keeps, and what it deliberately does not:
   log, a crash report or a window title, and never reaches a command line, an environment
   variable or a pipe.
 - **The settings** hold the backend, the reader, a module path, a TSA and its certificate, which
-  checks run after signing and when verifying, the appearance, how the stamp looks, the window's
-  size and position, and the toggles for Avanzado and the activity record. No name, no document
+  checks run after signing and when verifying (including whether a timestamp's origin is
+  validated), whether servers on the local network are allowed, the appearance, how the stamp
+  looks, the window's size and position, and the toggles for Avanzado and the activity record. No name, no document
   number, and no list of recent files, on purpose.
 - **Mi cédula** reads the cardholder's data and photo from the card and puts them on screen.
   Nothing is written until you press the button that asks where to put it, and the same goes for
@@ -233,7 +235,7 @@ cd firmauy-desktop-0.1.0-linux-x86_64
 The archive carries its own installer, so getting a menu entry and an icon needs nothing else:
 
 ```bash
-./install.sh firmauy-desktop                 # into ~/.local (or $XDG_DATA_HOME), no root
+./install.sh firmauy-desktop                 # into ~/.local/opt and ~/.local/bin, no root; the menu entry goes under $XDG_DATA_HOME
 sudo ./install.sh firmauy-desktop --system   # into /opt, owned by root whoever unpacked it
 ./uninstall.sh                               # and back out again (sudo and --system for /opt)
 ```
