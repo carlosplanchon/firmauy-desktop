@@ -111,7 +111,23 @@ dependencies = [
     # the reason sits where the version is chosen and does not hang on a line in someone else's
     # pyproject.
     "urllib3>=2.8.0",
-    "PySide6>=6.7",
+    # The Essentials wheel, not the PySide6 metapackage. That one is an empty shell depending on
+    # every wheel Qt publishes, and 6.12 split QtWebEngine and QtPdf out of Addons into wheels of
+    # their own and added both to it, so the line that used to fetch the toolkit started fetching
+    # a Chromium build as well: 111 MiB on Linux and 126 MiB on Windows per `uv sync` and per CI
+    # job, for modules nothing here imports. The app uses QtCore, QtGui and QtWidgets, the tests
+    # QtTest, and the icons QtSvg's image plugin; all of it ships in Essentials, which has been a
+    # wheel of its own since 6.3. Measured on 2026-10-29 against the metapackage at 6.12.0: the
+    # 832 tests and the 100 storybook screens come out identical, and the frozen Linux bundle is
+    # 22 MB smaller, since what leaves it is what the other wheels' plugins dragged in: Addons'
+    # virtual keyboard and, through it, Qml and Quick, and the PDF image format, whose library
+    # lived in PySide6-Pdf. A PDF preview, if one is ever wanted, is that wheel, 3 MB, not the
+    # metapackage.
+    # One trap: all five PySide6 wheels list PySide6/__init__.py and the .pyi stubs in their
+    # RECORD, so uninstalling the metapackage from an existing venv deletes files Essentials
+    # needs, and `from PySide6 import __version__` stops resolving. A fresh venv, as on CI, is
+    # fine; an old one needs `uv sync --reinstall-package pyside6-essentials` once.
+    "PySide6-Essentials>=6.7",
 ]
 
 [project.scripts]

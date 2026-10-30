@@ -198,10 +198,12 @@ uv run pyinstaller --clean --noconfirm packaging/firmauy-desktop.spec
 # output: dist/firmauy-desktop/  (run dist/firmauy-desktop/firmauy-desktop)
 ```
 
-The [spec](packaging/firmauy-desktop.spec) excludes the heavy Qt modules the app
-never uses (no QtWebEngine, QML/Quick or multimedia), which keeps the Linux
-bundle around 305 MB instead of 850 MB, and the Windows one around 160 MB. PyInstaller does not
-cross-compile, so each platform's binary is built on that platform.
+The project depends on the `PySide6-Essentials` wheel rather than the `PySide6` metapackage, so
+QtWebEngine and the other add-ons are never even downloaded, and the
+[spec](packaging/firmauy-desktop.spec) excludes the Qt modules the app never uses from what is
+left (no QML/Quick or multimedia), which keeps the Linux bundle around 300 MB instead of 850 MB,
+and the Windows one around 160 MB. PyInstaller does not cross-compile, so each platform's binary
+is built on that platform.
 
 On Windows the same command leaves `dist\firmauy-desktop\firmauy-desktop.exe`, and turning it into
 what a release hands over takes [Inno Setup 6](https://jrsoftware.org/isinfo.php) for the
