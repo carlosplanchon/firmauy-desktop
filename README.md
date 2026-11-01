@@ -201,8 +201,8 @@ uv run pyinstaller --clean --noconfirm packaging/firmauy-desktop.spec
 The project depends on the `PySide6-Essentials` wheel rather than the `PySide6` metapackage, so
 QtWebEngine and the other add-ons are never even downloaded, and the
 [spec](packaging/firmauy-desktop.spec) excludes the Qt modules the app never uses from what is
-left (no QML/Quick or multimedia), which keeps the Linux bundle around 300 MB instead of 850 MB,
-and the Windows one around 160 MB. PyInstaller does not cross-compile, so each platform's binary
+left (no QML/Quick or multimedia), which keeps the Linux bundle around 250 MB instead of 850 MB,
+and the Windows one around 150 MB. PyInstaller does not cross-compile, so each platform's binary
 is built on that platform.
 
 On Windows the same command leaves `dist\firmauy-desktop\firmauy-desktop.exe`, and turning it into
@@ -220,7 +220,7 @@ Builds live in **[Releases](https://github.com/carlosplanchon/firmauy-desktop/re
 file with a `.sha256` beside it:
 
 - **Linux:** a `.tar.gz`. It is not a zip on purpose: zipped uploads do not keep file permissions,
-  so the binary would arrive without its executable bit and without the 43 symbolic links a
+  so the binary would arrive without its executable bit and without the 35 symbolic links a
   PyInstaller bundle needs.
 - **Windows:** an installer, `-setup.exe`, and a `.zip` of the same bundle for running it without
   installing. A zip is fine there, since a Windows bundle has neither permissions nor links to lose.

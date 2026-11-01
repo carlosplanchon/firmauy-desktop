@@ -54,7 +54,7 @@ install -d "$bin" "$share/applications" \
 # shared libraries, the Qt plugins and the Python extensions live. An upgrade has to produce
 # exactly the new bundle, not the new one with the leftovers of every older one underneath.
 #
-# -a rather than -r: the bundle carries 43 symbolic links and PyInstaller requires a onedir build
+# -a rather than -r: the bundle carries 35 symbolic links and PyInstaller requires a onedir build
 # to keep them, so a copy that resolves them produces a much larger directory that may not run.
 staged="$opt.nuevo.$$"
 previous="$opt.viejo.$$"
