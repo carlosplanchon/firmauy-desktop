@@ -285,6 +285,10 @@ jobs:
       - name: Publish
         env:
           GH_TOKEN: ${{ github.token }}
+          # The repository by name. gh otherwise asks git which one it is in, and this job has no
+          # checkout on purpose: v0.1.0's first run built, checked and attested everything and
+          # then stopped here on "not a git repository".
+          GH_REPO: ${{ github.repository }}
         run: |
           # --verify-tag because gh will otherwise create a tag from the default branch when
           # handed one that does not exist, and this workflow publishes tags rather than making
