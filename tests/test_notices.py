@@ -224,6 +224,17 @@ def test_the_binary_packages_of_one_source_are_one_entry():
     assert "Paquetes: libxcb-render0, libxcb-shm0, libxcb1" in text
 
 
+@pytest.mark.parametrize("platform, dpkg, fatal", [
+    ("win32", None, True),          # nothing outside Python and its packages belongs there
+    ("linux", "/usr/bin/dpkg-query", True),   # what CI builds on: dpkg names every library
+    ("linux", None, False),         # a developer's Arch, say: nothing ships from it
+])
+def test_a_stranger_in_the_bundle_stops_the_build_where_owners_can_be_named(platform, dpkg, fatal):
+    """The first Windows build that wrote these notices carried a Java 8 JDK's C runtime and
+    MySQL's OpenSSL, because PATH led there. A warning in a log is how that went unseen."""
+    assert notices.can_identify_everything(platform, lambda name: dpkg) is fatal
+
+
 def test_without_dpkg_the_libraries_stay_unidentified(monkeypatch):
     monkeypatch.setattr(notices.shutil, "which", lambda name: None)
 

@@ -21,10 +21,11 @@ The spec calls ``write`` once COLLECT is done, which leaves the file next to the
 directory every artifact starts from: the zip, the tarball and both installers copy it whole, and
 the check_bundle scripts ask each copy for it.
 
-What it cannot see it says so, rather than guessing. On Linux the bundle also carries libraries of
-the machine it was built on; on a Debian or Ubuntu builder, which is what CI is, dpkg names the
-package and its copyright file goes in. Anywhere else they are listed as unidentified and the
-build says so out loud.
+What it cannot place it does not guess at. On Linux the bundle also carries libraries of the
+machine it was built on; on a Debian or Ubuntu builder, which is what CI is, dpkg names the
+package and its copyright file goes in. Where owners can be named, a file without one stops the
+build, because there it is something picked up off the machine rather than chosen; a Linux
+without dpkg lists them as unidentified and says so out loud.
 """
 
 from __future__ import annotations
@@ -529,13 +530,27 @@ def _python_licence() -> str | None:
     return None
 
 
+def can_identify_everything(platform: str | None = None, which=shutil.which) -> bool:
+    """Whether every file a build collects should have an owner this module can name.
+
+    On Windows anything that is not from a Python package or the interpreter is a stranger by
+    definition: the first CI build that wrote these notices carried 45 such files, a Java 8 JDK's
+    copy of the C runtime and MySQL's OpenSSL, collected because PATH led there. On Linux, dpkg
+    names every library a Debian or Ubuntu builder has, and that builder is CI. A Linux without
+    dpkg cannot, and nothing is distributed from one.
+    """
+    platform = sys.platform if platform is None else platform
+    return platform == "win32" or which("dpkg-query") is not None
+
+
 def write(path, entries, *, own=(), built=(), contents: str = "_internal") -> Inventory:
     """Write the notices for a build and say what it could not account for.
 
     Stops the build when a Python package ships without a licence text: that is a hole in the
     notices with a known fix (an entry in SUPPLIED), and finding it in CI beats finding it after a
-    release. A library of the build machine that cannot be identified is only a warning, since
-    the machines that cannot identify them are the ones nothing gets distributed from.
+    release. It also stops on a file nobody owns wherever owners can be named (see
+    ``can_identify_everything``), because there such a file is something the build picked up off
+    the machine rather than chose. Elsewhere it is a warning.
     """
     found = inventory(entries, own=own, built=built)
     missing = missing_licences(found)
@@ -547,6 +562,11 @@ def write(path, entries, *, own=(), built=(), contents: str = "_internal") -> In
 
     python_licence = _python_licence() if found.python else None
     system, unidentified = debian_packages(found.foreign)
+    if unidentified and can_identify_everything():
+        raise SystemExit(
+            "ERROR: estos archivos viajan en el bundle y no son de ningún paquete de Python, del "
+            "intérprete ni de la distribución, así que el build los levantó de la máquina: "
+            f"{', '.join(unidentified)}. Sacalos en el spec, o decí de dónde vienen.")
     text = render(found, app_version=_app_version(), qt_version=_qt_version(found),
                   python_licence=python_licence, system=system, unidentified=unidentified,
                   contents=contents, distro=_distribution_id() if system else "")

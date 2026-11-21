@@ -93,6 +93,14 @@ excludes = [
     "PySide6.QtOpenGL", "PySide6.QtOpenGLWidgets",
     "PySide6.QtRemoteObjects", "PySide6.QtScxml", "PySide6.QtStateMachine",
     "PySide6.QtTextToSpeech",
+    # Nothing here talks to the network through Qt: firmauy does its TSA and revocation requests
+    # with urllib3 and aiohttp, on Python's own ssl. QtNetwork arrived anyway, because
+    # PySide6/__init__.py imports it on Windows when a PySide6\openssl folder exists, which no
+    # PyPI wheel has, and the analysis sees the import without the condition. Its hook then goes
+    # looking for OpenSSL DLLs wherever PATH leads, since the wheels bring none: on the CI runner
+    # that was MySQL's installation, whose libssl-3-x64.dll and libcrypto-3-x64.dll shipped in
+    # every Windows build until tools/notices.py could not say whose they were.
+    "PySide6.QtNetwork",
     # Non-Qt heavyweights sometimes pulled transitively but unused here.
     "tkinter",
 ]
@@ -109,6 +117,16 @@ a = Analysis(
     excludes=excludes,
     noarchive=False,
 )
+
+# The Universal C Runtime, which PyInstaller collects on Windows from wherever PATH finds a copy, on
+# purpose, for targets older than Windows 10. On the CI runner that was the bin directory of a Java
+# 8 JDK: 43 files of somebody else's program. Windows 10 is the installer's floor, and from Windows
+# 10 on the UCRT is part of the system, which Windows uses even when a program brings its own (as
+# PyInstaller's own note in depend/dylib.py says, citing Microsoft), so they did nothing but ship.
+if sys.platform == "win32":
+    a.binaries = [entry for entry in a.binaries
+                  if not re.fullmatch(r"(api-ms-win-.+|ucrtbase)\.dll",
+                                      os.path.basename(entry[0]), re.IGNORECASE)]
 
 pyz = PYZ(a.pure)
 
