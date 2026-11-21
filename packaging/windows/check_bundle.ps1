@@ -34,6 +34,21 @@ if ($Version) {
     Write-Output "bundle: el .exe declara la versión $declared"
 }
 
+# The licences of what other people wrote, Qt's LGPL among them, which asks for its text to travel
+# with every copy. The build writes the file next to the executable after PyInstaller is done, so
+# it is exactly the kind of thing a copy can leave behind without anything else noticing.
+$notices = Join-Path $Root "THIRD-PARTY-NOTICES.txt"
+$lgpl = $false
+if (Test-Path -LiteralPath $notices -PathType Leaf) {
+    # $true or nothing, depending on the PowerShell; -not reads both the same way.
+    $lgpl = Select-String -LiteralPath $notices -SimpleMatch "GNU LESSER GENERAL PUBLIC LICENSE" -Quiet
+}
+if (-not $lgpl) {
+    Write-Output "::error::$notices no está, o no trae la LGPL de Qt"
+    exit 1
+}
+Write-Output "bundle: avisos de terceros en su lugar"
+
 # A GUI-subsystem executable does not hold the console: PowerShell launches it and moves on, so
 # `& $exe` would report the exit code of nothing. Start-Process -Wait is what waits for it, and
 # the redirection is what brings back the line each self-test prints. Arguments are quoted by

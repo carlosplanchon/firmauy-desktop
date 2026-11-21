@@ -14,6 +14,11 @@ import sys
 
 from PyInstaller.utils.hooks import collect_all, collect_data_files, collect_submodules
 
+# The repository's own build tooling, imported from the checkout. It is not a dependency and the
+# analysis below cannot reach it: the bundle is built from entry.py and src/ only.
+sys.path.insert(0, os.path.normpath(os.path.join(SPECPATH, "..")))
+from tools import notices  # noqa: E402
+
 entry = os.path.join(SPECPATH, "entry.py")
 src = os.path.normpath(os.path.join(SPECPATH, "..", "src"))
 
@@ -133,12 +138,27 @@ coll = COLLECT(
     name="firmauy-desktop",
 )
 
+# Whose work this bundle ships besides the app's own, under which licence and where its source is:
+# Qt's LGPL first among them, which asks for exactly that with every copy. Read off what the
+# analysis collected rather than listed by hand (tools/notices.py says why), and written next to
+# the executable, where somebody looks, after COLLECT rather than handed to it: COLLECT puts every
+# data file under _internal/. The zip, the tarball and both installers copy this directory whole,
+# so every artifact carries it, and the check_bundle scripts ask each copy for it.
+notices.write(
+    os.path.join(coll.name, notices.FILENAME),
+    [*a.scripts, *a.pure, *a.binaries, *a.datas],
+    own=[src, SPECPATH],
+    built=[workpath],
+)
+
 # macOS only: PyInstaller ignores this everywhere else, so it costs nothing on Linux or Windows.
 # The .icns is the one thing Finder and the Dock read, and neither will look at the .ico or the
 # PNG. Both containers are rebuilt from assets/icon.svg by tools/make_icons.py.
 #
 # NOT VERIFIED ON MACOS: there is no Mac in this project's CI yet. Confirm the identifier before
-# anything is signed or notarised with it, because it is what the signature binds to.
+# anything is signed or notarised with it, because it is what the signature binds to. BUNDLE also
+# builds the .app from COLLECT's list rather than from the directory, so the notices written above
+# would not be in it: a Mac build has to add them.
 app = BUNDLE(
     coll,
     name="FirmaUY Desktop.app",

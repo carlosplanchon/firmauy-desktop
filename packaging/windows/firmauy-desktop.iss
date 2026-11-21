@@ -49,10 +49,15 @@ DisableProgramGroupPage=yes
 DisableDirPage=auto
 
 ; x64 only: the bundle is a 64-bit Python, and it is also why the PKCS#11 module it can load is the
-; 64-bit gclib.dll. Windows 10 is the floor Python 3.14 itself sets.
+; 64-bit gclib.dll.
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
-MinVersion=10.0
+; Windows 10 version 1809 (build 17763) rather than any 10.0, because the floor is Qt's and not
+; Python's: Qt 6.12 supports Windows 10 from 1809 on, so a bare 10.0 let the installer put the app
+; on builds it may not start on, and say nothing. Qt's own documentation also calls 6.12 the last
+; Qt to support Windows 10 at all, so a PySide6 6.13 bump is the day this line, the README and the
+; release notes stop being true together.
+MinVersion=10.0.17763
 
 ; An open copy holds its own files, and replacing a running bundle half way is how an upgrade
 ; leaves a mix of two versions. The Restart Manager asks it to close first.

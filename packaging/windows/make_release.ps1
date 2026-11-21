@@ -70,12 +70,19 @@ Client hace falta solo para el modo PKCS#11 o la pantalla Avanzado.
 
 Windows puede avisar que protegió tu equipo: el programa todavía no está firmado
 con un certificado de código. "Más información" y después "Ejecutar de todas formas".
+Si tenés activado Smart App Control ("Control inteligente de aplicaciones"), esa
+opción no aparece: Windows lo bloquea y no deja hacer una excepción para un
+programa puntual. Hasta que esté firmado, con esa protección activada no corre.
+
 Para comprobar que el archivo salió del repositorio y no de otro lado:
 
     gh attestation verify $name.zip -R carlosplanchon/firmauy-desktop
 
 Tus ajustes quedan en el registro (HKCU\Software\firmauy) y el registro de
 actividad, si lo activás, en %LOCALAPPDATA%\firmauy. Borrar esta carpeta no los toca.
+
+Las licencias de lo que el programa trae de otros proyectos, Qt entre ellos, están
+en firmauy-desktop\THIRD-PARTY-NOTICES.txt.
 
 https://github.com/carlosplanchon/firmauy-desktop
 "@

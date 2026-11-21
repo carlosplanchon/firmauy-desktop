@@ -298,7 +298,7 @@ jobs:
             --title "FirmaUY Desktop ${{ needs.build.outputs.version }}" \
             --notes "Linux x86_64, glibc 2.35 y superiores. Descomprimí y corré, o usá el install.sh que viene adentro.
 
-          Windows 10 y 11 de 64 bits: el instalador (-setup.exe), o el .zip para correrlo sin instalar. Todavía no está firmado con un certificado de código, así que Windows puede avisar que protegió tu equipo: Más información, y después Ejecutar de todas formas.
+          Windows 10 y 11 de 64 bits: el instalador (-setup.exe), o el .zip para correrlo sin instalar. Todavía no está firmado con un certificado de código, así que Windows puede avisar que protegió tu equipo: Más información, y después Ejecutar de todas formas. Con Smart App Control (Control inteligente de aplicaciones) activado esa opción no aparece: Windows lo bloquea y no deja hacer una excepción para un programa puntual, así que hasta que esté firmado no corre ahí.
 
           Para comprobar que el archivo salió de este repositorio y no de otro lado:
 

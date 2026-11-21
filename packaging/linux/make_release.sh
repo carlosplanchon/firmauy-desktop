@@ -62,6 +62,9 @@ Desinstalar no toca tus ajustes ni el registro de actividad, y te dice dónde qu
 Necesitás pcscd corriendo y un lector de tarjetas. El resto viene adentro.
 Construido sobre glibc 2.35, así que distribuciones más viejas que esa no están soportadas.
 
+Las licencias de lo que el programa trae de otros proyectos, Qt entre ellos, están
+en firmauy-desktop/THIRD-PARTY-NOTICES.txt.
+
 https://github.com/carlosplanchon/firmauy-desktop
 TXT
 

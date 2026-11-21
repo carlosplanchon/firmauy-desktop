@@ -24,6 +24,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (QApplication, QDialog, QDialogButtonBox, QLabel, QLineEdit,
                                QMessageBox, QVBoxLayout, QWidget)
 
+from firmauy_desktop import __version__
 from firmauy_desktop.backend import pin_shape
 from firmauy_desktop.ui import components, icons, tokens
 from firmauy_desktop.ui.theming import base_point_size
@@ -218,6 +219,13 @@ def confirm_batch_conflicts(parent: Optional[QWidget], conflicts: list, total: i
 # is why it is a literal rather than a call to the clock.
 COPYRIGHT = "Copyright © 2026 Carlos A. Planchón"
 
+# Not courtesy: the LGPL's own condition. A program that shows copyright notices while it runs has
+# to show Qt's among them, with a pointer to the copies of the LGPL and the GPL it ships
+# (LGPL-3.0, section 4c). Those copies are in the file the build writes next to the executable,
+# whose name a test holds equal to tools/notices.py's.
+QT_NOTICE = "Copyright © The Qt Company Ltd. y otros colaboradores"
+NOTICES_FILE = "THIRD-PARTY-NOTICES.txt"
+
 
 def _version_of(package: str) -> str:
     try:
@@ -318,6 +326,9 @@ def about_dialog(parent: Optional[QWidget]) -> None:
         f"PySide6 {PYSIDE_VERSION}\n\n"
         f"{COPYRIGHT}\n"
         "Software libre, licenciado bajo Apache License 2.0.\n\n"
+        f"Qt y PySide6: {QT_NOTICE}. Se usan bajo la GNU LGPL versión 3. Esa licencia, la GPL "
+        "versión 3 sobre la que está escrita y las de los demás componentes están en "
+        f"{NOTICES_FILE}, junto al programa.\n\n"
         # Two claims, not one, because they deny different things and only one of them is paired
         # with the README. "No es una aplicación oficial" says this is not a State product, which
         # is the sentence test_theming holds and README.md carries in English. "Ni afiliado ni
@@ -344,7 +355,14 @@ def about_dialog(parent: Optional[QWidget]) -> None:
         # text bold and at body size, which reads as the first line of a paragraph rather than as
         # the name of the thing. Possible at all because this box renders markup, which it does
         # for the links below and nothing else.
-        _titled(f"FirmaUY Desktop {_version_of('firmauy-desktop')}"),
+        #
+        # __version__ and not the installed metadata, which is what this read before. A frozen
+        # build carries no metadata for this package: PyInstaller copies it only for names it
+        # finds written out in an importlib.metadata call, and this one arrives as a variable.
+        # So every packaged build said "FirmaUY Desktop desconocida" while a source checkout said
+        # 0.1.0. firmauy's metadata does travel, through collect_all in the spec, which is why
+        # the line about it below can keep asking.
+        _titled(f"FirmaUY Desktop {__version__}"),
         _linked(body, REPO, SECURITY_CONTACT),
         icon=QMessageBox.Icon.Information,
         links=True,

@@ -289,6 +289,11 @@ The builds are not signed with a code-signing certificate yet, so SmartScreen wi
 protected your PC the first time: "Más información", then "Ejecutar de todas formas". That warning
 is about who vouches for the file, which is the question `gh attestation verify` above answers.
 
+Smart App Control ("Control inteligente de aplicaciones") is the one setting that stops it
+outright. With it on, Windows blocks an unsigned program with no button to run it anyway, and
+Microsoft offers no exception for a single app: the choices are turning the feature off or a
+signed build, and there is no signed build yet.
+
 Installing over an existing copy replaces it rather than merging into it. Uninstalling, from
 Configuración or the Start menu, leaves your settings (`HKCU\Software\firmauy`) and the activity
 record (`%LOCALAPPDATA%\firmauy`) alone.
@@ -310,3 +315,8 @@ Found a security problem, especially anything touching the PIN? Report it privat
 ## License
 
 Apache-2.0.
+
+A packaged build also carries other people's work, Qt and PySide6 under the LGPL-3.0 and Python
+itself among it. `THIRD-PARTY-NOTICES.txt`, next to the executable, says which version of each is
+inside, under which licence and where its source is, with the licence texts in full. It is
+written from what the build actually collected, by [`tools/notices.py`](tools/notices.py).

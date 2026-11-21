@@ -306,6 +306,46 @@ def test_the_about_box_disclaims_the_app_and_not_the_signature(qapp, monkeypatch
     assert "certificación" not in shown["detail"].lower()
 
 
+def test_the_about_title_does_not_need_the_apps_installed_metadata(qapp, monkeypatch):
+    """A frozen build carries no metadata for firmauy-desktop, since PyInstaller copies it only
+    for names it finds written out in an importlib.metadata call. Read from there, the title said
+    "FirmaUY Desktop desconocida" in every packaged build and 0.1.0 from a checkout, so nothing
+    run from source could see it. This is that build, as far as the metadata is concerned:
+    firmauy's travels with the bundle and the app's own does not."""
+    from firmauy_desktop import __version__, dialogs
+
+    def as_frozen(name):
+        if name == "firmauy-desktop":
+            raise dialogs.PackageNotFoundError(name)
+        return "1.21.1"
+
+    shown = {}
+    monkeypatch.setattr(dialogs, "version", as_frozen)
+    monkeypatch.setattr(dialogs.QMessageBox, "exec", lambda self: shown.update(
+        text=self.text(), detail=self.informativeText()) or 0)
+    dialogs.about_dialog(None)
+
+    assert f"FirmaUY Desktop {__version__}" in shown["text"]
+    assert "desconocida" not in shown["text"] + shown["detail"]
+
+
+def test_the_about_box_shows_qts_notice_and_where_its_licences_are(qapp, monkeypatch):
+    """The box shows a copyright notice, and the LGPL asks a program that does to show Qt's among
+    them, with a pointer to the copies of the LGPL and the GPL that come with it (LGPL-3.0,
+    section 4c). Those copies are in the notices file every bundle carries."""
+    from firmauy_desktop import dialogs
+
+    shown = {}
+    monkeypatch.setattr(dialogs.QMessageBox, "exec", lambda self: shown.update(
+        detail=self.informativeText()) or 0)
+    dialogs.about_dialog(None)
+
+    assert "The Qt Company" in dialogs.QT_NOTICE
+    assert dialogs.QT_NOTICE in shown["detail"]
+    assert "LGPL versión 3" in shown["detail"] and "GPL versión 3" in shown["detail"]
+    assert dialogs.NOTICES_FILE in shown["detail"]
+
+
 def test_a_disabled_spin_box_looks_disabled(qapp, qtbot):
     """The stylesheet named QLineEdit and QComboBox and nothing else, so a spin box fell through
     to whatever Fusion draws. Fusion barely dims one, so a control greyed out on purpose still

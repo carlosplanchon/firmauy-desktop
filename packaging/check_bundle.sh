@@ -30,6 +30,16 @@ if [ "$links" -eq 0 ]; then
 fi
 echo "bundle: $links symlinks, ejecutable con permisos"
 
+# The licences of what other people wrote, Qt's LGPL among them, which asks for its text to travel
+# with every copy. The build writes the file next to the executable after PyInstaller is done, so
+# it is exactly the kind of thing a copy can leave behind without anything else noticing.
+notices="$root/THIRD-PARTY-NOTICES.txt"
+if ! grep -q "GNU LESSER GENERAL PUBLIC LICENSE" "$notices" 2>/dev/null; then
+    echo "::error::$notices no está, o no trae la LGPL de Qt"
+    exit 1
+fi
+echo "bundle: avisos de terceros en su lugar"
+
 # A bundle missing Qt's svg plugin starts, builds every screen and draws nothing where the icons
 # go, silently. Counting pixels is the only way to tell it from a working one.
 "$exe" --selftest-icons
