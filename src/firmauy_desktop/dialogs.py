@@ -31,6 +31,13 @@ from firmauy_desktop.ui.theming import base_point_size
 
 
 REPO = "https://github.com/carlosplanchon/firmauy-desktop"
+# The project's site, which is what somebody opening Acerca de is most likely after: what FirmaUY
+# is, how to install it, where to download it. Shown before the repository, which stays for the
+# source and the issues.
+#
+# Every copy ever installed keeps pointing here, so the domain has to outlive them: one that
+# lapses is a link, inside an app that asks for a PIN, to whatever its next owner puts there.
+WEBSITE = "https://firmauy.com/"
 # The address SECURITY.md asks people to use, so a problem with the PIN never has to become a
 # public issue first. Named here rather than typed into the dialog, so a test can hold the two
 # together: the failure mode is Acerca de quietly pointing at an address nobody reads any more.
@@ -345,6 +352,9 @@ def about_dialog(parent: Optional[QWidget]) -> None:
         # whatever program produced the signature. What is disclaimed here is the software.
         "Proyecto independiente. No es una aplicación oficial del Estado uruguayo, ni está "
         "afiliado a él ni respaldado por él.\n\n"
+        # Bare, each on a line of its own: a label in front would push the repository past the
+        # width that keeps a URL on one line, and test_tools holds that width.
+        f"{WEBSITE}\n"
         f"{REPO}\n"
         f"Contacto: {SECURITY_CONTACT}"
     )
@@ -363,7 +373,7 @@ def about_dialog(parent: Optional[QWidget]) -> None:
         # 0.1.0. firmauy's metadata does travel, through collect_all in the spec, which is why
         # the line about it below can keep asking.
         _titled(f"FirmaUY Desktop {__version__}"),
-        _linked(body, REPO, SECURITY_CONTACT),
+        _linked(body, WEBSITE, REPO, SECURITY_CONTACT),
         icon=QMessageBox.Icon.Information,
         links=True,
     )

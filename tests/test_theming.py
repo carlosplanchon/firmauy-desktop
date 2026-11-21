@@ -306,6 +306,22 @@ def test_the_about_box_disclaims_the_app_and_not_the_signature(qapp, monkeypatch
     assert "certificación" not in shown["detail"].lower()
 
 
+def test_the_about_box_points_at_the_site_before_the_repository(qapp, monkeypatch):
+    """Somebody who opens Acerca de is far more likely to want the site, with what FirmaUY is and
+    where to download it, than the source. Both can be clicked, and the site comes first."""
+    from firmauy_desktop import dialogs
+
+    shown = {}
+    monkeypatch.setattr(dialogs.QMessageBox, "exec", lambda self: shown.update(
+        detail=self.informativeText()) or 0)
+    dialogs.about_dialog(None)
+
+    site = f'<a href="{dialogs.WEBSITE}">{dialogs.WEBSITE}</a>'
+    repo = f'<a href="{dialogs.REPO}">{dialogs.REPO}</a>'
+    assert site in shown["detail"] and repo in shown["detail"]
+    assert shown["detail"].index(site) < shown["detail"].index(repo)
+
+
 def test_the_about_title_does_not_need_the_apps_installed_metadata(qapp, monkeypatch):
     """A frozen build carries no metadata for firmauy-desktop, since PyInstaller copies it only
     for names it finds written out in an importlib.metadata call. Read from there, the title said

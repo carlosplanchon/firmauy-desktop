@@ -380,8 +380,10 @@ def test_the_app_can_say_where_it_came_from():
     assert dialogs.REPO in readme, "the dialog and the README disagree about where this lives"
 
     # A URL that wraps cannot be copied in one go, and copying is the only thing anybody does
-    # with one. QMessageBox picks its own width, so the guard is on the length of the line.
-    assert len(f"Contacto: {dialogs.SECURITY_CONTACT}") < 56
+    # with one. QMessageBox picks its own width, so the guard is on the length of the line, for
+    # every line in the box that carries one.
+    for line in (dialogs.WEBSITE, dialogs.REPO, f"Contacto: {dialogs.SECURITY_CONTACT}"):
+        assert len(line) < 56, f"{line!r} can wrap"
 
 
 def test_only_the_about_box_renders_markup():
